@@ -89,7 +89,27 @@ static func spec(kind: String) -> Dictionary:
 				"rings": [[-5.1, 0.75], [2.4, 0.72]], "bombs": 10,
 				"top": BOMBER_TOP, "under": BOMBER_UNDER, "mass": 4200.0, "cruise": 36.0, "stall": 21.0,
 			}
+		"transport":
+			# three engines (nose and two nacelles), a deep boxy cabin for a stick of 12, a door on the left
+			return {
+				"span_u": 26.0, "span_l": 23.5, "chord_u": 3.0, "chord_l": 2.7, "y_u": 2.55, "y_l": -0.95,
+				"z_u": -0.9, "z_l": -0.6, "ail": [9.0, 12.8], "struts": [4.2, 8.0, 11.4],
+				"fus": [[-7.6, 0.45, 0.5, 0.15], [-7.1, 0.8, 0.95, 0.2], [-5.2, 0.95, 1.15, 0.2], [2.8, 0.95, 1.15, 0.2],
+					[6.0, 0.55, 0.75, 0.35], [10.6, 0.14, 0.22, 0.6]],
+				"nose": "inline", "prop_r": 1.5,
+				"props": [Vector3(0, 0.15, -7.75), Vector3(-4.2, 0.55, -3.35), Vector3(4.2, 0.55, -3.35)],
+				"nacelles": [Vector3(-4.2, 0.55, -1.4), Vector3(4.2, 0.55, -1.4)],
+				"tail": [9.6, 7.6, 1.6], "fin": [9.5, 1.6, 1.4], "twin_fin": true,
+				"gear": [-1.3, -2.45, 4.2, 0.6, 2], "skid": [10.2, -1.55],
+				"seats": [[-6.0, "pilot"]], "fixed_mg": [], "rings": [], "bombs": 0,
+				"cabin": {"door_z": 3.0, "door_w": 0.95, "door_h": 1.6, "windows": [-4.4, -3.2, -2.0, -0.8, 0.4, 1.6], "seats": 12},
+				"top": BOMBER_TOP, "under": BOMBER_UNDER, "mass": 5600.0, "cruise": 34.0, "stall": 19.0,
+			}
 	return {}
+
+
+static func is_big(kind: String) -> bool:
+	return float(spec(kind).get("span_u", 0.0)) > 18.0
 
 
 static func make(kind: String) -> Aircraft:
@@ -114,6 +134,8 @@ static func make(kind: String) -> Aircraft:
 	_tail(a, s, groups["Tail"])
 	_gear(a, s, groups["Gear"])
 	_props(a, s, groups)
+	if s.has("cabin"):
+		_cabin(a, s, groups["Fuselage"])
 	_far(a, s)
 	a.finish()
 	return a
@@ -513,7 +535,9 @@ static func _gear(a: Aircraft, s: Dictionary, grp: Node3D) -> void:
 	var g := TrainGeo.new()
 	var legs: Array = [0.0]
 	if s.has("nacelles"):
-		legs = [-3.6, 3.6]
+		legs = []
+		for nc: Vector3 in s["nacelles"]:
+			legs.append(nc.x)
 	for lx: float in legs:
 		var bottom := _y_at(s, gz) - _hh_at(s, gz) if lx == 0.0 else float(s["y_l"])
 		var axle_half := track if lx == 0.0 else 0.55
@@ -565,7 +589,7 @@ static func _props(a: Aircraft, s: Dictionary, groups: Dictionary) -> void:
 	for i in props.size():
 		var at: Vector3 = props[i]
 		var parent: Node3D = groups["Fuselage"]
-		if props.size() > 1:
+		if absf(at.x) > 0.5:
 			parent = groups["WingL" if at.x < 0.0 else "WingR"]
 		var hub := Node3D.new()
 		hub.name = "Prop%d" % i
@@ -643,3 +667,58 @@ static func message_bag() -> Node3D:
 		seg.position = Vector3(0, 0.2 + 0.45 * float(i), 0)
 		seg.rotation.x = PI * 0.5
 	return n
+
+
+## Transport cabin: windows down both sides, a sliding door on the left with a dark doorway behind it,
+## a hanging ladder, and the marks the paratroopers use (door sill, static-line anchor, inside the door).
+static func _cabin(a: Aircraft, s: Dictionary, grp: Node3D) -> void:
+	var m := material()
+	var cab: Dictionary = s["cabin"]
+	var dz: float = cab["door_z"]
+	var dw: float = cab["door_w"]
+	var dh: float = cab["door_h"]
+	var g := TrainGeo.new()
+	var floor_y := _y_at(s, dz) - _hh_at(s, dz) + 0.25
+	for wz: float in cab["windows"]:
+		for side: float in [-1.0, 1.0]:
+			var hw := _hw_at(s, wz)
+			g.box(Vector3(side * (hw + 0.01), floor_y + 1.25, wz), Vector3(0.01, 0.16, 0.24), GLASS)
+			g.box(Vector3(side * (hw + 0.012), floor_y + 1.25, wz), Vector3(0.008, 0.2, 0.28), BLACK)
+	# the doorway (dark) and its frame
+	var dhw := _hw_at(s, dz)
+	g.box(Vector3(-dhw - 0.012, floor_y + dh * 0.5, dz), Vector3(0.006, dh * 0.5, dw * 0.5), BLACK)
+	g.box(Vector3(-dhw - 0.03, floor_y + dh + 0.04, dz), Vector3(0.03, 0.04, dw * 0.5 + 0.06), METAL)
+	g.box(Vector3(-dhw - 0.03, floor_y - 0.03, dz), Vector3(0.05, 0.03, dw * 0.5 + 0.06), METAL)
+	# sliding rail aft of the door
+	g.box(Vector3(-dhw - 0.03, floor_y + dh + 0.1, dz + dw), Vector3(0.02, 0.02, dw), METAL)
+	g.make(grp, "Cabin", m)
+	# the door panel (slides aft along the rail)
+	var door := Node3D.new()
+	door.name = "Door"
+	door.position = Vector3(-dhw - 0.05, floor_y + dh * 0.5, dz)
+	grp.add_child(door)
+	var dg := TrainGeo.new()
+	dg.box(Vector3.ZERO, Vector3(0.025, dh * 0.5, dw * 0.5 + 0.03), s["top"])
+	dg.box(Vector3(-0.03, 0.0, -dw * 0.3), Vector3(0.02, 0.05, 0.03), METAL)
+	dg.make(door, "Mesh", m)
+	a.door = door
+	a.door_closed_z = dz
+	a.door_open_z = dz + dw + 0.05
+	# a short ladder hung from the sill for loading on the ground
+	var ladder := Node3D.new()
+	ladder.name = "Ladder"
+	ladder.position = Vector3(-dhw - 0.15, floor_y, dz)
+	grp.add_child(ladder)
+	var lg := TrainGeo.new()
+	for sz: float in [-0.25, 0.25]:
+		lg.cyl(Vector3(-0.05, 0.0, sz), Vector3(-0.35, -1.25, sz), 0.025, 4, WOOD_DARK)
+	for k in 3:
+		var u := (float(k) + 1.0) / 4.0
+		lg.cyl(Vector3(-0.05 - 0.3 * u, -1.25 * u, -0.25), Vector3(-0.05 - 0.3 * u, -1.25 * u, 0.25), 0.02, 4, WOOD)
+	lg.make(ladder, "Mesh", m)
+	a.ladder = ladder
+	a.marks["door_sill"] = Vector3(-dhw - 0.05, floor_y, dz)           # where a jumper stands to go
+	a.marks["door_in"] = Vector3(-dhw + 0.5, floor_y, dz)              # just inside
+	a.marks["line_anchor"] = Vector3(-dhw + 0.15, floor_y + dh + 0.05, dz - dw * 0.3)
+	a.marks["ladder_foot"] = Vector3(-dhw - 0.6, floor_y - 1.3, dz)
+	a.seats_n = cab["seats"]

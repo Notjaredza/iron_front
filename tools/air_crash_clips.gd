@@ -3,7 +3,7 @@ extends RefCounted
 ## through an AnimationPlayer from assets/air/crashes.res, exactly as the game would play it, with the smoke,
 ## fire and impact effects driven from the clip's fire_level, rpm and crash_time tracks.
 
-const CLIPS := ["fighter_spin", "fighter_wing", "spotter_spin", "spotter_wing", "bomber_spin", "bomber_wing", "balloon_burn"]
+const CLIPS := ["fighter_spin", "fighter_wing", "spotter_spin", "spotter_wing", "bomber_spin", "bomber_wing", "transport_spin", "transport_wing", "balloon_burn"]
 
 var m: Object
 var player: AnimationPlayer
@@ -61,7 +61,7 @@ func _plane_step(t: float, dt: float) -> void:
 	var after := crash_t >= 0.0 and player.current_animation_position >= crash_t
 	if after and not hit_done:
 		hit_done = true
-		var bl := Blast.new().setup(2 if a.kind != "bomber" else 3, Vector3(p.x, 0.0, p.z), 7)
+		var bl := Blast.new().setup(2 if not AirParts.is_big(a.kind) else 3, Vector3(p.x, 0.0, p.z), 7)
 		m.stage.add_child(bl)
 	if a.fire_level > 0.0:
 		var engines := _engines()

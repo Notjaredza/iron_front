@@ -294,3 +294,24 @@ func approach(dt: float, h: float, glide := 0.07, target_speed := -1.0) -> bool:
 		position.y = ground_height(h, p)
 		return true
 	return false
+
+
+# ------------------------------------------------------------------ transport cabin
+
+var door: Node3D
+var door_closed_z := 0.0
+var door_open_z := 0.0
+var ladder: Node3D
+var seats_n := 0
+
+
+## Slides the cabin door: 0 shut, 1 open.
+func set_door(u: float) -> void:
+	if door:
+		door.position.z = lerpf(door_closed_z, door_open_z, clampf(u, 0.0, 1.0))
+
+
+## World point of a cabin mark (door_sill, door_in, line_anchor, ladder_foot), riding on the fuselage.
+func mark_world(nm: String) -> Vector3:
+	var f: Node3D = get_node("Fuselage")
+	return to_global(f.transform * (marks[nm] as Vector3))

@@ -7,7 +7,7 @@ extends SceneTree
 
 const OUT := "res://results/air/"
 const FPS := 30.0
-const TYPES := ["fighter", "spotter", "bomber"]
+const TYPES := ["fighter", "spotter", "bomber", "transport"]
 
 var cam: Camera3D
 var stage: Node3D
@@ -37,8 +37,13 @@ func _run() -> void:
 	var clips: Array[String] = []
 	for t: String in TYPES:
 		for c: String in ["flying", "weapons", "takeoff", "landing"]:
+			if t == "transport" and c == "weapons":
+				continue
 			clips.append(t + "_" + c)
 	clips.append("balloon_winch")
+	var pc: GDScript = load("res://tools/air_para_clips.gd")
+	for c: String in pc.CLIPS:
+		clips.append(c)
 	if ResourceLoader.exists("res://tools/air_crash_clips.gd"):
 		var cc: GDScript = load("res://tools/air_crash_clips.gd")
 		for c: String in cc.CLIPS:
@@ -182,6 +187,10 @@ func _chase(off: Vector3, dt: float, k := 3.0, fov := 45.0) -> void:
 func _clip(nm: String) -> void:
 	_new_stage()
 	var parts := nm.split("_")
+	if nm.begins_with("para_"):
+		var pc: GDScript = load("res://tools/air_para_clips.gd")
+		await pc.new().play(self, nm)
+		return
 	if nm == "balloon_winch":
 		await _balloon_winch()
 		return

@@ -12,7 +12,7 @@ extends RefCounted
 const LIB_PATH := "res://assets/air/crashes.res"
 const START_H := 110.0          # planes start this high (origin above the ground)
 const BALLOON_H := 80.0         # the balloon basket starts this high
-const PLANES := ["fighter", "spotter", "bomber"]
+const PLANES := ["fighter", "spotter", "bomber", "transport"]
 const KINDS := ["spin", "wing"]
 
 

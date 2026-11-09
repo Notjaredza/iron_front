@@ -205,11 +205,11 @@ func _bake_plane(kind: String, mode: String) -> Animation:
 				else:
 					# the nose drops and it winds up into a spin; the path bends down into a steep helix
 					var k := smoothstep(t_hit + 0.4, t_hit + 2.0, t)
-					spin_rate = lerpf(0.0, 2.3 if kind != "bomber" else 1.2, k)
+					spin_rate = lerpf(0.0, 2.3 if not AirParts.is_big(kind) else 1.2, k)
 					yaw += spin_rate * DT
-					pitch = lerpf(0.0, -1.15 if kind != "bomber" else -0.9, k)
+					pitch = lerpf(0.0, -1.15 if not AirParts.is_big(kind) else -0.9, k)
 					roll = lerpf(0.0, 0.5, k) + sin(t * 3.0) * 0.05 * k
-					var down := lerpf(0.0, 30.0 if kind != "bomber" else 24.0, smoothstep(t_hit + 0.4, t_hit + 3.0, t))
+					var down := lerpf(0.0, 30.0 if not AirParts.is_big(kind) else 24.0, smoothstep(t_hit + 0.4, t_hit + 3.0, t))
 					var fwd := Basis(Vector3.UP, yaw) * Vector3(0, 0, -1)
 					var hspeed := lerpf(cruise, 8.0, k)
 					vel = fwd * hspeed + Vector3(0, -down, 0)
@@ -241,7 +241,7 @@ func _bake_plane(kind: String, mode: String) -> Animation:
 					var mbox := _aabb(a, [wr, a.far])
 					main = _body(stage, a.global_transform * xf, mbox, mass * 0.85, 0.12, 0.15)
 					main.linear_velocity = vel
-					main.angular_velocity = Vector3(0.5, -0.35, -2.4) if kind != "bomber" else Vector3(0.3, -0.2, -1.2)
+					main.angular_velocity = Vector3(0.5, -0.35, -2.4) if not AirParts.is_big(kind) else Vector3(0.3, -0.2, -1.2)
 				if main != null:
 					var xf := a.global_transform.affine_inverse() * main.global_transform
 					for gname: String in GROUPS:
