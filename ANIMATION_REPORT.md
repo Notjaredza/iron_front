@@ -30,3 +30,16 @@ Contact sheets for every clip: results/units/anim/sheet_<clip>.png.
 
 - Thin light wedges show at bent knees (gaps between the thigh and shin pieces).
 - Hit and death labels in the video sit close together.
+
+# Gunner squad (started 2026-11-09 on the user's go)
+
+ETA: models and first pictures about 1 to 1.5 h; moves about 2 to 3 h after the OK.
+
+## Step 1: models (done 2026-11-09, waits for the user's look)
+
+Pictures in results/units/mg/: mg_gun.png (4 views, one with the shield), mg_parts.png, mg_crew.png (front and back, labelled), mg_team.png and mg_team_front.png (set up in action, loose placement), mg_carry.png (on the march with loads).
+
+- `scripts/units/mg_builder.gd`: generic water-cooled heavy MG (572 tris close, 192 mid), tripod open (232) and folded (104), ammo box closed/open (112), optional shield (64). Grip, feed, muzzle and carry points for IK.
+- Crew roles in `SoldierBuilder.look_for_role`: gunner (no rifle, no pack, holster, gloves), loader (no rifle, pack, holster, gloves), carriers (rifle slung, pack, boxes), NCO (no rifle, holster, binoculars, map case, sergeant's stripes). Crew 894 to 1214 tris.
+- New: rifle slung on the back (rig "back" mode), `Soldier.pose_spec_world` (hands to world points), `Soldier.attach` (props on bones).
+- The team poses in the pictures are rough stand-ins; the real moves come in step 2.

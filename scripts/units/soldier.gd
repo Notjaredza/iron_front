@@ -31,9 +31,9 @@ static func material() -> StandardMaterial3D:
 	return _mat
 
 
-func setup(seed_value: int, lod_level := 0) -> Soldier:
+func setup(seed_value: int, lod_level := 0, role := "") -> Soldier:
 	lod = lod_level
-	look = B.look_from_seed(seed_value)
+	look = B.look_from_seed(seed_value) if role.is_empty() else B.look_for_role(seed_value, role)
 	skel = Skeleton3D.new()
 	skel.name = "Skeleton"
 	add_child(skel)
@@ -80,3 +80,30 @@ func show_clip(clip: Dictionary, time: float) -> void:
 
 func show_globals(g: Array[Transform3D]) -> void:
 	Anim.apply(skel, g)
+
+
+## Poses from a spec. world_hands: "hand_r"/"hand_l" -> a world point the palm must reach
+## (solved twice so the ground lift does not pull the hands off their marks).
+func pose_spec_world(spec: Dictionary, world_hands := {}) -> void:
+	var p := spec.duplicate(true)
+	var lift_y := 0.0
+	for it in 2:
+		for k in world_hands:
+			var m := global_transform.affine_inverse() * (world_hands[k] as Vector3)
+			p[k] = [-1, m - Vector3(0, lift_y, 0)]
+		var g := Rig.solve(p, p, 0.0)
+		lift_y = Rig.ground_lift(g, geo)
+		if it == 1 or world_hands.is_empty():
+			Rig.lift(g, lift_y)
+			Anim.apply(skel, g)
+			return
+
+
+## Hangs a prop on a bone (its frame: the bone's joint, rest-aligned axes).
+func attach(bone_id: int, prop: Node3D, local: Transform3D) -> Node3D:
+	var att := BoneAttachment3D.new()
+	att.bone_name = B.BONE_NAMES[bone_id]
+	skel.add_child(att)
+	prop.transform = local
+	att.add_child(prop)
+	return prop

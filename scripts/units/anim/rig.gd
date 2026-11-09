@@ -137,6 +137,10 @@ static func item_xf(r: Dictionary, g: Array[Transform3D]) -> Transform3D:
 			var d: Vector3 = r.get("dir", Vector3.FORWARD)
 			var bas := Basis.looking_at(d.normalized(), Vector3.UP) * Basis(Vector3.BACK, roll)
 			return Transform3D(bas, butt - bas * B.BUTT)
+		"back":
+			# Slung across the back, muzzle up behind the left shoulder.
+			var bas := Basis.looking_at(Vector3(-0.5, 0.85, 0.06).normalized(), Vector3(0, 0, 1))
+			return g[B.CHEST] * Transform3D(bas, Vector3(0.08, -0.2, 0.24) - bas * B.GRIP_R)
 		"hand":
 			# Held by the right hand: GRIP_R in the palm, turned by "rot" in the hand's frame.
 			var bas := Basis.from_euler((r.get("rot", Vector3.ZERO) as Vector3) * DEG)

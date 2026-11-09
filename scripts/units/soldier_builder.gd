@@ -61,7 +61,30 @@ static func look_from_seed(seed_value: int) -> Dictionary:
 		"shovel": pack and r.randf() < 0.35,
 		"canteen": [-1, 1, 0][r.randi() % 3],  # which hip, 0 = none
 		"net": r.randf() < 0.8,
+		"role": "rifleman",
+		"rifle": true,
 	}
+
+
+## Crew roles (heavy MG team): the same body, its own kit.
+##   gunner   no rifle, no pack, pistol holster, leather gloves
+##   loader   no rifle, small pack, pistol holster, leather gloves
+##   carrier  rifle, pack (carries ammo boxes or a gun load)
+##   nco      no rifle, no pack, holster, binoculars, map case, sergeant's stripes
+static func look_for_role(seed_value: int, role: String) -> Dictionary:
+	var lk := look_from_seed(seed_value)
+	lk["role"] = role
+	match role:
+		"gunner":
+			lk.merge({"rifle": false, "pack": false, "roll": 0, "shovel": false, "holster": true, "gloves": true}, true)
+		"loader":
+			lk.merge({"rifle": false, "pack": true, "roll": 0, "shovel": false, "holster": true, "gloves": true}, true)
+		"carrier":
+			lk.merge({"rifle": true, "pack": true}, true)
+		"nco":
+			lk.merge({"rifle": false, "pack": false, "roll": 0, "shovel": false, "holster": true, "binoculars": true,
+				"map_case": true, "stripes": true}, true)
+	return lk
 
 
 static func bone_side(s: float, right: int, left: int) -> int:
@@ -85,6 +108,7 @@ static func build(look: Dictionary, lod: int) -> UnitGeo:
 	var w: float = look.get("build", 1.0)
 	var wl := lerpf(1.0, w, 0.6)
 	var skin: Color = look.get("skin", SKINS[1])
+	var hand_col: Color = LEATHER if look.get("gloves", false) else skin
 	var X := Vector3.RIGHT
 	var Z := Vector3.BACK
 
@@ -150,6 +174,34 @@ static func build(look: Dictionary, lod: int) -> UnitGeo:
 		g.loft([Vector3(cx, 0.955, 0.06), Vector3(cx, 1.065, 0.06)], [Vector2(0.045, 0.04), Vector2(0.045, 0.04)],
 			X, 6, 0.0, OLIVE_DARK, HIPS)
 
+	# Role kit: pistol holster, binoculars, map case, sergeant's stripes.
+	if look.get("holster", false):
+		g.box(Vector3(0.165 * w, 0.965, -0.075), Vector3(0.026, 0.062, 0.042), LEATHER, HIPS, Basis(Vector3.FORWARD, 0.18), 0.2 if d0 else 0.0)
+		if d0:
+			g.box(Vector3(0.165 * w, 1.03, -0.075), Vector3(0.03, 0.012, 0.046), BOOT_DARK, HIPS, Basis(Vector3.FORWARD, 0.18))
+	if look.get("binoculars", false):
+		for s: float in [1.0, -1.0]:
+			g.loft([Vector3(0.032 * s, 1.22, -0.15 * w), Vector3(0.032 * s, 1.33, -0.152 * w)],
+				[Vector2(0.026, 0.026), Vector2(0.022, 0.022)], X, 6 if d0 else 4, 0.0, METAL, CHEST)
+			if d0:
+				g.loft([Vector3(0.03 * s, 1.335, -0.15 * w), Vector3(0.07 * s, 1.48, -0.07)],
+					[Vector2(0.008, 0.003), Vector2(0.008, 0.003)], X, 4, 0.0, LEATHER, CHEST, null, 0)
+		g.box(Vector3(0, 1.30, -0.152 * w), Vector3(0.012, 0.018, 0.012), METAL, CHEST)
+	if look.get("map_case", false):
+		g.box(Vector3(-0.175 * w, 0.93, -0.03), Vector3(0.014, 0.09, 0.085), LEATHER, HIPS, Basis(), 0.2 if d0 else 0.0)
+		if d0:
+			g.loft([Vector3(-0.17 * w, 1.0, -0.06), Vector3(0.0, 1.22, -0.14 * w), Vector3(0.13, 1.48, -0.03)],
+				[Vector2(0.01, 0.003), Vector2(0.01, 0.003), Vector2(0.01, 0.003)], X, 4, 0.0, LEATHER, CHEST, null, 0)
+	if look.get("stripes", false):
+		for s: float in [1.0, -1.0]:
+			var xo := 0.214 * s + 0.069 * wl * s
+			for k in 3:
+				var y := 1.30 - 0.024 * k
+				var tip := Vector3(xo, y, 0.0)
+				for e: float in [-1.0, 1.0]:
+					g.loft([Vector3(xo - 0.004 * s, y + 0.026, 0.036 * e), tip], [Vector2(0.006, 0.004), Vector2(0.006, 0.004)],
+						X, 4, 0.0, KHAKI, bone_side(s, UARM_R, UARM_L))
+
 	# Neck, head, face.
 	g.loft([Vector3(0, 1.47, 0.01), Vector3(0, 1.59, 0.0)], [Vector2(0.056, 0.056), Vector2(0.054, 0.054)],
 		X, ls, 0.0, skin, NECK, null, 0)
@@ -193,11 +245,12 @@ static func build(look: Dictionary, lod: int) -> UnitGeo:
 			[Vector2(0.058, 0.062) * wl, Vector2(0.052, 0.056) * wl], X, ls, 0.0, OLIVE, fa, null, 0)
 		var hb := bone_side(s, HAND_R, HAND_L)
 		g.loft([Vector3(0.241 * s, 0.88, 0.0), Vector3(0.246 * s, 0.755, -0.008)],
-			[Vector2(0.03, 0.048), Vector2(0.025, 0.044)], X, 4, 0.0, skin, hb, null, 2)
+			[Vector2(0.03, 0.048), Vector2(0.025, 0.044)], X, 4, 0.0, hand_col, hb, null, 2)
 		if d0:
-			g.box(Vector3(0.226 * s, 0.825, -0.042), Vector3(0.016, 0.03, 0.016), skin, hb)
+			g.box(Vector3(0.226 * s, 0.825, -0.042), Vector3(0.016, 0.03, 0.016), hand_col, hb)
 
-	_build_rifle(g, lod)
+	if look.get("rifle", true):
+		_build_rifle(g, lod)
 	return g
 
 
@@ -232,6 +285,7 @@ static func _build_rifle(g: UnitGeo, lod: int) -> void:
 ## The far version: one simple shape per body part (about 150 triangles).
 static func _build_far(g: UnitGeo, look: Dictionary) -> void:
 	var skin: Color = look.get("skin", SKINS[1])
+	var hand_col: Color = LEATHER if look.get("gloves", false) else skin
 	var X := Vector3.RIGHT
 	for s: float in [1.0, -1.0]:
 		var x := 0.10 * s
@@ -251,4 +305,5 @@ static func _build_far(g: UnitGeo, look: Dictionary) -> void:
 	g.box(Vector3(0, 1.68, -0.005), Vector3(0.09, 0.12, 0.1), skin, HEAD)
 	g.loft([Vector3(0, 1.735, 0), Vector3(0, 1.75, 0), Vector3(0, 1.885, 0.006)],
 		[Vector2(0.168, 0.178), Vector2(0.13, 0.14), Vector2(0.06, 0.065)], X, 4, 0.0, HELMET, HEAD)
-	_build_rifle(g, 2)
+	if look.get("rifle", true):
+		_build_rifle(g, 2)
