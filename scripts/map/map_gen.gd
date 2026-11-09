@@ -65,6 +65,7 @@ func _run(seed: int, w: int, h: int) -> MapData:
 	stages += ", rails %d" % (Time.get_ticks_msec() - tt)
 	tt = Time.get_ticks_msec()
 	_places()
+	_busy()
 	stages += ", places %d" % (Time.get_ticks_msec() - tt)
 	d.notes.append("stages ms: " + stages)
 	d.gen_ms = Time.get_ticks_msec() - t0
@@ -999,6 +1000,49 @@ func _places() -> void:
 			if _settle(at, kind, rail_dist[i] <= 6 and d.coarse[i] == 1 and kind == "village"):
 				taken.append(at)
 				want -= 1
+
+
+## Cells ground detail keeps off: along the rail lines, round houses and platforms, and on the ramps.
+func _busy() -> void:
+	_bz = PackedByteArray()
+	_bz.resize(d.w * d.h)
+	for rl in d.rails:
+		var pts: PackedVector2Array = rl["pts"]
+		for k in range(1, pts.size()):
+			var a := pts[k - 1]
+			var b := pts[k]
+			var n := int(a.distance_to(b) / 4.0) + 1
+			for i in n + 1:
+				_mark_busy(a.lerp(b, float(i) / n), 0)
+	for p in d.places:
+		for hd in p["houses"]:
+			var hp: Vector3 = hd["pos"]
+			var sz: Vector2 = hd["size"]
+			_mark_busy(Vector2(hp.x, hp.z), 1 if maxf(sz.x, sz.y) < 20.0 else 3)
+	for r in d.ramps:
+		var e: float = r["e"]
+		var s: int = r["s"]
+		for k in range(-1, 6):
+			for l in range(int(r["a"]) - 1, int(r["a"]) + int(r["w"]) + 1):
+				var along := int(floor(e)) + s * k
+				var x := along if int(r["axis"]) == 0 else l
+				var z := l if int(r["axis"]) == 0 else along
+				if x >= 0 and z >= 0 and x < d.w and z < d.h:
+					_bz[z * d.w + x] = 1
+	d.busy = _bz
+	_bz = PackedByteArray()
+
+
+var _bz := PackedByteArray()
+
+
+func _mark_busy(p: Vector2, r: int) -> void:
+	var cx := int(p.x / MapData.CELL)
+	var cz := int(p.y / MapData.CELL)
+	for z in range(cz - r, cz + r + 1):
+		for x in range(cx - r, cx + r + 1):
+			if x >= 0 and z >= 0 and x < d.w and z < d.h:
+				_bz[z * d.w + x] = 1
 
 
 func _count(kind: String) -> int:

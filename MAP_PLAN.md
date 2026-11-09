@@ -43,3 +43,24 @@ Asset Builder Chat, 2026-11-09. This is the brief from DESIGN.md ("The map" sect
 | Frame rate to 60 FPS, plus the report and pictures | 2-3 | 16-17 |
 
 **First pictures** of the ground will be ready after about 5 h, for an early look before ramps and water.
+
+## Round 2: ground detail (the user's answers, 2026-11-09)
+The user's look: cliffs, plateaus, ramps, water, rail lines, colours and camera are all good. The villages stay as placeholders until the asset rounds.
+
+**The change:** add detail to the ground.
+- **Kinds:** all four:
+  - painted ground in the shader: grass patches, dry spots, worn dirt;
+  - grass tufts and flowers, close up only;
+  - rocks and stones;
+  - bushes (no trees yet).
+- **Amount:** light. It should break up the flat green but stay clean and readable for armies.
+- **Cliff banks:** left as they are; ground only.
+
+**ETA: about 2 h**
+
+| Step | Time |
+|---|---|
+| Painted ground | 30 min |
+| Tufts and flowers near the camera | 40 min |
+| Rocks and bushes per chunk | 40 min |
+| Checks, pictures and frame rate | 20 min |

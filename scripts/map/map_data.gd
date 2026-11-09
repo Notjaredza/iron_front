@@ -24,6 +24,7 @@ var ch := 375
 var coarse := PackedByteArray()                # cw * ch levels 0..3
 var field := PackedByteArray()                 # (w + 1) * (h + 1) corner levels 0..3
 var walk := PackedByteArray()                  # w * h: the level of a flat cell, or FLAT_NONE
+var busy := PackedByteArray()                  # w * h: 1 where ground detail must keep off (rails, houses, ramps)
 ## Ramps: {"t": upper level, "axis": 0 for x or 1 for z, "s": +1/-1 (direction from high to low), "e": float (the
 ## cliff line, in cells along the axis), "a": int (the first lateral cell), "w": int (cells wide)}.
 var ramps: Array = []

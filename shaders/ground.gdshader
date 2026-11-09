@@ -1,5 +1,5 @@
 // Iron Front: the map's one material. Flat vertex colours with a little tone change per 8 m cell and over large
-// patches. Vertex alpha tags: 1 plain, 0.5 water, 0.25 a window that glows at night.
+// patches. Vertex alpha tags: 1 plain, 0.75 grass ground (painted patches), 0.5 water, 0.25 a window that glows at night.
 // mood 0 is bright day and 1 is night (cool, darker, less colour). haze greys the colours for fog.
 shader_type spatial;
 render_mode cull_back, diffuse_burley, specular_schlick_ggx;
@@ -13,8 +13,11 @@ void vertex() {
 	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 }
 
+// A hash that stays steady at large world coordinates (a sine hash breaks into straight bands there).
 float h2(vec2 p) {
-	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+	vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+	p3 += dot(p3, p3.yzx + 33.33);
+	return fract((p3.x + p3.y) * p3.z);
 }
 
 float vnoise(vec2 p) {
@@ -32,6 +35,7 @@ void fragment() {
 	vec3 c = to_linear(COLOR.rgb);
 	float a = COLOR.a;
 	bool water = a > 0.4 && a < 0.6;
+	bool grass = a > 0.7 && a < 0.8;
 	bool win = a < 0.4;
 	float rough = 0.93;
 	float spec = 0.2;
@@ -45,6 +49,18 @@ void fragment() {
 		float cell = h2(floor(wpos.xz / 8.0) + vec2(floor(wpos.y * 0.25)));
 		float big = vnoise(wpos.xz * 0.005);
 		c *= 0.97 + 0.035 * cell + 0.1 * (big - 0.5);
+		if (grass) {
+			// Painted ground (light): soft darker and lighter patches, dry yellow spots and a few worn dirt patches.
+			vec2 p = wpos.xz;
+			float n1 = vnoise(p * 0.014);
+			float n2 = vnoise(p * 0.05 + 17.0);
+			float n3 = vnoise(p * 0.16 + 41.0);
+			c *= 0.93 + 0.14 * n1 + 0.05 * (n3 - 0.5);
+			float dry = smoothstep(0.70, 0.75, n2 * 0.72 + n3 * 0.28);
+			c = mix(c, to_linear(vec3(0.70, 0.66, 0.38)) * (0.95 + 0.1 * n3), dry * 0.36);
+			float worn = smoothstep(0.83, 0.86, vnoise(p * 0.022 + 73.0) * 0.85 + n3 * 0.15);
+			c = mix(c, to_linear(vec3(0.55, 0.43, 0.29)) * (0.92 + 0.12 * n3), worn * 0.85);
+		}
 	}
 	float l = dot(c, vec3(0.299, 0.587, 0.114));
 	vec3 cool = mix(vec3(l), c, 0.32) * vec3(0.82, 0.88, 1.02);

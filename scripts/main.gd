@@ -25,6 +25,7 @@ func _ready() -> void:
 	cam = RtsCamera.new()
 	add_child(cam)
 	cam.current = true
+	view.cam = cam
 	var layer := CanvasLayer.new()
 	add_child(layer)
 	hud = Label.new()
@@ -48,7 +49,7 @@ func new_map(s: int) -> void:
 	cam.place()
 	for n in view.data.notes:
 		print("MAP ", n)
-	print("MAP seed %d: %d chunks, %d triangles, meshes built in %d ms" % [seed, view.chunks.size(), view.tris, view.build_ms])
+	print("MAP seed %d: %d chunks, %d triangles (+%d in rocks and bushes), meshes built in %d ms" % [seed, view.chunks.size(), view.tris, view.detail_tris, view.build_ms])
 
 
 func _unhandled_key_input(event: InputEvent) -> void:

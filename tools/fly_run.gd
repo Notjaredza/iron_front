@@ -30,7 +30,7 @@ func _run() -> void:
 			view.set_look(MapView.Look.FOG)
 	cam.enabled = false
 	var sz := view.data.size_m()
-	for h: float in [120.0, 400.0, 1000.0, 2500.0]:
+	for h: float in [30.0, 120.0, 400.0, 1000.0, 2500.0]:
 		cam.height = h
 		cam.yaw = 0.0
 		cam.target = Vector3(sz.x * 0.2, 0, sz.y * 0.15)

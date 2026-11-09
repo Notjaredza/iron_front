@@ -23,7 +23,8 @@ const WATER_A := 0.5
 const WINDOW_A := 0.25
 
 const C_WATER := Color(0.23, 0.46, 0.66, WATER_A)
-const C_LEVEL := [Color(0.23, 0.46, 0.66), Color(0.40, 0.60, 0.24), Color(0.45, 0.64, 0.26), Color(0.50, 0.67, 0.29)]
+const GRASS_A := 0.75              # grass ground: the shader paints patches on it
+const C_LEVEL := [Color(0.23, 0.46, 0.66), Color(0.40, 0.60, 0.24, GRASS_A), Color(0.45, 0.64, 0.26, GRASS_A), Color(0.50, 0.67, 0.29, GRASS_A)]
 const C_LIP := Color(0.32, 0.49, 0.19)
 const C_DIRT_HI := Color(0.57, 0.41, 0.25)
 const C_DIRT_LO := Color(0.49, 0.34, 0.20)
@@ -88,14 +89,25 @@ func _build(cx: int, cz: int) -> Dictionary:
 	_skirt()
 	_rails()
 	_houses()
+	var arrays := _take()
+	var tris := vt.size() / 3
+	vt = PackedVector3Array()
+	nm = PackedVector3Array()
+	co = PackedColorArray()
+	_details()
+	var detail := _take()
+	return {"arrays": arrays, "tris": tris, "detail": detail, "detail_tris": vt.size() / 3, "walls": wall_keys,
+		"aabb": AABB(Vector3(x0 * MapData.CELL, SKIRT_Y, z0 * MapData.CELL), Vector3((x1 - x0) * MapData.CELL, 40.0, (z1 - z0) * MapData.CELL))}
+
+
+func _take() -> Array:
 	var arrays := []
 	if vt.size() > 0:
 		arrays.resize(Mesh.ARRAY_MAX)
 		arrays[Mesh.ARRAY_VERTEX] = vt
 		arrays[Mesh.ARRAY_NORMAL] = nm
 		arrays[Mesh.ARRAY_COLOR] = co
-	return {"arrays": arrays, "tris": vt.size() / 3, "walls": wall_keys,
-		"aabb": AABB(Vector3(x0 * MapData.CELL, SKIRT_Y, z0 * MapData.CELL), Vector3((x1 - x0) * MapData.CELL, 40.0, (z1 - z0) * MapData.CELL))}
+	return arrays
 
 
 # ------------------------------------------------------------------------------------------------------- helpers
@@ -629,3 +641,75 @@ func _ruin(p: Vector3, size: Vector2, rot: float, k: int) -> void:
 	for i in 3:
 		var o := Vector3((_h01(k * 5 + i) - 0.5) * size.x * 0.7, 0, (_h01(k * 9 + i) - 0.5) * size.y * 0.7)
 		box(p + _rot(o, rot), Vector3(1.6, 0.5 + _h01(k + i) * 0.6, 1.3), rot + i, C_RUBBLE)
+
+
+# ------------------------------------------------------------------------------------------- rocks and bushes
+# Rocks and bushes go in a second mesh per chunk ("detail"), drawn only near the camera.
+
+const ROCK_P := 0.008             # per flat cell (light), more by cliffs and on the plateaus
+const BUSH_P := 0.0035            # clumps per flat cell
+const C_ROCK := [Color(0.55, 0.53, 0.49), Color(0.50, 0.49, 0.46), Color(0.60, 0.57, 0.51)]
+const C_BUSH := [Color(0.27, 0.43, 0.17), Color(0.31, 0.47, 0.19), Color(0.24, 0.38, 0.16)]
+
+
+func _details() -> void:
+	for z in range(z0, z1):
+		for x in range(x0, x1):
+			var i := z * d.w + x
+			var f := d.walk[i]
+			if f == 0 or f == MapData.FLAT_NONE or d.busy[i] == 1:
+				continue
+			var k := (z * 7919 + x) * 31 + d.seed
+			var r := _h01(k)
+			var pr := ROCK_P * (1.6 if f >= 2 else 1.0)
+			if r < pr * 6.0 and _by_cliff(x, z):
+				pr *= 6.0
+			var y := MapData.level_y(f)
+			if r < pr:
+				var big := _h01(k + 11) < 0.12 and f >= 2
+				var size := (1.8 + 1.4 * _h01(k + 3)) if big else (0.35 + 0.9 * _h01(k + 3))
+				_lump(Vector3((x + 0.15 + 0.7 * _h01(k + 1)) * MapData.CELL, y, (z + 0.15 + 0.7 * _h01(k + 2)) * MapData.CELL),
+					size, size * (0.55 + 0.3 * _h01(k + 4)), k, C_ROCK[k % 3])
+				# A few small stones round a rock.
+				for j in int(_h01(k + 5) * 3.0):
+					var o := Vector3((_h01(k + 20 + j) - 0.5) * 4.0, 0, (_h01(k + 30 + j) - 0.5) * 4.0)
+					var ss := 0.18 + 0.25 * _h01(k + 40 + j)
+					_lump(Vector3((x + 0.5) * MapData.CELL, y, (z + 0.5) * MapData.CELL) + o, ss, ss * 0.6, k + 50 + j, C_ROCK[(k + j) % 3])
+			elif r > 1.0 - BUSH_P:
+				var n := 2 + int(_h01(k + 6) * 3.0)
+				for j in n:
+					var o := Vector3((_h01(k + 60 + j) - 0.5) * 7.0, 0, (_h01(k + 70 + j) - 0.5) * 7.0)
+					var bs := 1.3 + 1.1 * _h01(k + 80 + j)
+					_lump(Vector3((x + 0.5) * MapData.CELL, y, (z + 0.5) * MapData.CELL) + o, bs, bs * 0.85, k + 90 + j, C_BUSH[(k + j) % 3])
+
+
+func _by_cliff(x: int, z: int) -> bool:
+	for o in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+		var nx: int = x + o.x
+		var nz: int = z + o.y
+		if nx >= 0 and nz >= 0 and nx < d.w and nz < d.h and d.walk[nz * d.w + nx] == MapData.FLAT_NONE:
+			return true
+	return false
+
+
+## A low-poly lump (rock or bush): an apex, a jittered middle ring of 5 and a base ring of 5 (15 faces).
+func _lump(p: Vector3, r: float, h: float, k: int, col: Color) -> void:
+	var top := p + Vector3((_h01(k + 101) - 0.5) * r * 0.4, h, (_h01(k + 102) - 0.5) * r * 0.4)
+	var mid := []
+	var base := []
+	var a0 := _h01(k + 103) * TAU
+	for i in 5:
+		var a := a0 + i * TAU / 5.0
+		var rr := r * (0.75 + 0.4 * _h01(k + 110 + i))
+		mid.append(p + Vector3(cos(a) * rr, h * (0.4 + 0.25 * _h01(k + 120 + i)), sin(a) * rr))
+		var b := a + TAU / 10.0
+		base.append(p + Vector3(cos(b) * r * 0.85, -0.15, sin(b) * r * 0.85))
+	var lit := col.lightened(0.08)
+	for i in 5:
+		var m0: Vector3 = mid[i]
+		var m1: Vector3 = mid[(i + 1) % 5]
+		var b0: Vector3 = base[i]
+		var bm: Vector3 = base[(i + 4) % 5]
+		tri(top, m0, m1, lit, (top + m0 + m1) / 3.0 - p)
+		tri(m0, m1, b0, col, (m0 + m1 + b0) / 3.0 - p)
+		tri(m0, bm, b0, col.darkened(0.06), (m0 + bm + b0) / 3.0 - p)

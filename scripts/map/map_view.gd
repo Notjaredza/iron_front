@@ -13,6 +13,10 @@ var sun: DirectionalLight3D
 var env: Environment
 var look := Look.DAY
 var chunks: Array[MeshInstance3D] = []
+var details: Array[MeshInstance3D] = []   # rocks and bushes per chunk, drawn near the camera only
+var scatter: GroundScatter               # grass tufts and flowers round the camera
+var cam: RtsCamera
+var detail_tris := 0
 var tris := 0
 var build_ms := 0
 var _results: Array = []
@@ -41,12 +45,17 @@ func _ready() -> void:
 	we.environment = env
 	add_child(we)
 	set_look(Look.DAY)
+	scatter = GroundScatter.new()
+	scatter.mat = mat
+	add_child(scatter)
 
 
 func build(seed: int, w := 1000, h := 1500) -> void:
-	for c in chunks:
+	for c in chunks + details:
 		c.queue_free()
 	chunks.clear()
+	details.clear()
+	scatter.clear()
 	data = MapGen.generate(seed, w, h)
 	var t0 := Time.get_ticks_msec()
 	var ncx := MapMesher.chunks_x(data)
@@ -56,6 +65,7 @@ func build(seed: int, w := 1000, h := 1500) -> void:
 	var task := WorkerThreadPool.add_group_task(_mesh_one.bind(ncx), ncx * ncz, -1, true, "map chunks")
 	WorkerThreadPool.wait_for_group_task_completion(task)
 	tris = 0
+	detail_tris = 0
 	for i in _results.size():
 		var r: Dictionary = _results[i]
 		if (r["arrays"] as Array).is_empty():
@@ -69,7 +79,22 @@ func build(seed: int, w := 1000, h := 1500) -> void:
 		add_child(mi)
 		chunks.append(mi)
 		tris += int(r["tris"])
+		var da: Array = r["detail"]
+		if not da.is_empty():
+			var dm := ArrayMesh.new()
+			dm.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, da)
+			var di := MeshInstance3D.new()
+			di.mesh = dm
+			di.material_override = mat
+			di.name = "detail_%d" % i
+			di.visibility_range_end = 900.0
+			di.visibility_range_end_margin = 100.0
+			di.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
+			add_child(di)
+			details.append(di)
+			detail_tris += int(r["detail_tris"])
 	_results.clear()
+	scatter.data = data
 	_outside()
 	build_ms = Time.get_ticks_msec() - t0
 
@@ -166,6 +191,8 @@ func look_name() -> String:
 
 ## Shadows and haze follow the camera height (as in WW1): fine shadows near, none from high up.
 func follow(height: float) -> void:
+	if cam != null:
+		scatter.update(cam.target, height)
 	sun.shadow_enabled = height < 1500.0
 	sun.directional_shadow_max_distance = clampf(height * 1.8, 150.0, 900.0)
 	# Thinner fog from high up, so the whole map stays clear; the fog look keeps more of it.

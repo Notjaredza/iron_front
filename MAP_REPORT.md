@@ -76,3 +76,44 @@ This was a fly-over at WW1's pan speed (tools/fly_run.gd, seed 2). Each map has 
 6. **Trees** come later, as you asked.
 
 **Note:** another chat is building the rifleman in this same repo, and its commits sit between mine. Its files weren't touched.
+
+## Round 2: ground detail (2026-11-09, 21:30)
+
+Your answers: all four kinds, light, ground only (cliff banks unchanged). **State: built and checked, ready for your look.**
+
+- **Painted ground (shader):**
+  - large soft patches of lighter and darker grass;
+  - dry straw-coloured spots;
+  - a few worn dirt patches.
+  - It is drawn by the shader, so it costs no triangles, and it sits on all grass, ramp edges included.
+- **Grass tufts and flowers:**
+  - small clusters of 5-blade tufts, plus white and yellow flowers;
+  - placed only within 200 m of the camera, fading out by about 170 m, and none above 260 m;
+  - built in 64 m tiles, two per frame, so panning stays smooth.
+  - A spot always gets the same tufts, because each spot's tufts come from the map seed.
+- **Rocks and stones:**
+  - low-poly lumps with small stones round them;
+  - a few more on plateaus and along cliff feet;
+  - now and then a big boulder up top.
+- **Bushes:** rare clumps of 2-4 round bushes.
+- **Keep-clear:** no detail on water, cliffs, ramps, rail lines, or in and around houses and platforms (the new `MapData.busy` mask).
+- Rocks and bushes are built with each chunk's mesh and only drawn within 900 m: 734 k triangles over the whole map, a small share of them on screen.
+
+**Checks:** check_map seed 2: every check passes, including no holes and closed walls.
+
+**Frame rate** (fly-over, seed 2, quiet laptop):
+
+| Camera height | Average fps | Worst second | Draw calls | Triangles drawn |
+|---|---|---|---|---|
+| 30 m | 92 | 89 | 113 | 240 k |
+| 120 m | 106 | 99 | 57 | 45 k |
+| 400 m | 97 | 97 | 54 | 100 k |
+| 1000 m | 88 | 87 | 39 | 67 k |
+| 2500 m | 70 | 70 | 104 | 365 k |
+
+**Pictures:** results/d2_ground_close_day.png, d2_ground_close_night.png, d2_ground_mid_day.png and d2_cliffs_day.png (all from `tools/map_pictures.gd -- --seed=2 --out=d2`).
+
+**Easy to tune:**
+- how many tufts and flowers (TUFT_P, FLOWER_P in ground_scatter.gd);
+- how many rocks and bushes (ROCK_P, BUSH_P in map_mesher.gd);
+- the patch strength (the shader's grass section).

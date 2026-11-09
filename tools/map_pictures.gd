@@ -5,7 +5,8 @@ extends SceneTree
 ## - a village with a station;
 ## - a broken rail line;
 ## - a river;
-## - eye level at a ramp.
+## - eye level at a ramp;
+## - the ground close up (24 m) and at 75 m, for the ground detail.
 ## It takes these by day, and the cliffs, village and whole map at night and in fog too.
 ## Run:  Godot --path . --resolution 1600x900 --script res://tools/map_pictures.gd [-- --seed=N --out=prefix]
 ## Writes results/<prefix>_<view>_<look>.png and ends with "MAP PICTURES DONE n".
@@ -69,6 +70,8 @@ func _views(d: MapData) -> Array:
 			var yaw := atan2(up.x, up.z)
 			out_v.append(["cliffs", p, 160.0, yaw, all])
 			out_v.append(["ramp_eye", p - up * 30.0, 2.0, yaw, day])
+			out_v.append(["ground_close", p - up * 90.0, 24.0, yaw + 0.5, [MapView.Look.DAY, MapView.Look.NIGHT]])
+			out_v.append(["ground_mid", p - up * 70.0, 75.0, yaw, day])
 			break
 	for p in d.places:
 		if p["station"]:
