@@ -133,9 +133,11 @@ static func build(size: int, at: Vector3, seed_value: int, density := 1.0) -> Di
 	if size >= 6:
 		var Hc := H * 1.6
 		var Rs := S * 0.7
-		var Rc := S * (2.0 if size == 8 else 1.4)
+		var Rc := S * (2.0 if size == 8 else (1.4 if size == 7 else 1.8))
+		var six := size == 6                  # round B: 6 has a stem that widens upwards into a broad cap
 		for i in int(float(r[11]) * 1.3):
-			var cap := rng.randf() < 0.38
+			var cap := rng.randf() < (0.55 if six else 0.38)
+			var hf := pow(rng.randf(), 0.8)
 			var target: Vector3
 			var k: float
 			if cap:
@@ -144,13 +146,12 @@ static func build(size: int, at: Vector3, seed_value: int, density := 1.0) -> Di
 				target = at + Vector3(d.x * Rc * ring, Hc * rng.randf_range(0.86, 1.08), d.z * Rc * ring)
 				k = 0.32
 			else:
-				var hf := pow(rng.randf(), 0.8)
-				var rr := Rs * (0.5 + 0.6 * hf) * sqrt(rng.randf())
+				var rr := Rs * ((0.25 + 1.1 * hf) if six else (0.5 + 0.6 * hf)) * sqrt(rng.randf())
 				target = at + _disc().normalized() * rr + Vector3(0, Hc * hf * 0.9 + Rs * 0.3, 0)
 				k = 0.5
 			var p0 := at + Vector3(0, F * 0.4, 0) + _ball() * F * 0.4
 			var life := SL * rng.randf_range(0.7, 1.05)
-			var s1 := (Rc * rng.randf_range(0.2, 0.32)) if cap else (Rs * rng.randf_range(0.55, 0.9))
+			var s1 := (Rc * rng.randf_range(0.2, 0.32)) if cap else (Rs * rng.randf_range(0.55, 0.9) * ((0.45 + 0.5 * hf) if six else 1.0))
 			var col := _smoke_col() if not cap else _smoke_col().lightened(0.12)
 			_add(smoke, p0, (target - p0) * k, rng.randf_range(0.15, 3.5), life, k, 0.4, s1 * 0.3, s1,
 				col, rng.randf_range(-0.15, 0.15), 0.8, 1.0)
@@ -220,23 +221,25 @@ static func _add(buf: PackedFloat32Array, p0: Vector3, v0: Vector3, t0: float, l
 
 
 ## Age at which a clod thrown from p0 with v0 lands back on ground height gy (or its life if it never does).
+## Round B: Newton steps from the no-drag landing time (the height curve is concave, so starting past the landing
+## it walks straight back to it); round A stepped along the path, which cost 225 ms for a size 8.
 static func _land(p0: Vector3, v0: Vector3, k: float, gy: float, life: float) -> float:
-	var t := 0.05
-	var prev := 0.0
-	while t < life:
-		if _y(p0.y, v0.y, k, t) < gy:
-			var a := prev
-			var b := t
-			for i in 14:
-				var m := (a + b) * 0.5
-				if _y(p0.y, v0.y, k, m) < gy:
-					b = m
-				else:
-					a = m
-			return a
-		prev = t
-		t += 0.05
-	return life
+	if _y(p0.y, v0.y, k, 0.02) < gy:
+		return 0.02
+	var h := maxf(p0.y - gy, 0.0)
+	var t := (v0.y + sqrt(v0.y * v0.y + 2.0 * G * h)) / G + 0.05
+	for i in 8:
+		var f := _y(p0.y, v0.y, k, t) - gy
+		var x := exp(-k * t) if k >= 0.0001 else 1.0
+		var df := v0.y * x - (G / k * (1.0 - x) if k >= 0.0001 else G * t)
+		if absf(df) < 1e-5:
+			break
+		var nt := t - f / df
+		if absf(nt - t) < 0.0005:
+			t = nt
+			break
+		t = maxf(nt, 0.02)
+	return minf(t, life)
 
 
 static func _y(y0: float, vy: float, k: float, t: float) -> float:

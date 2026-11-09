@@ -4,17 +4,21 @@ extends SceneTree
 ## Keys: 1-8 fire that size where the camera looks (sizes 1, 4 and 8 are the tuned ones in round A),
 ## B faceted or soft smoke, V both styles side by side, X a salvo, N day/night, C clear craters, H hide the help,
 ## K camera shake on/off. Mouse: right button drag to turn, wheel to zoom; WASD move, Q/E turn.
+## Round B: G grenade, M mines (anti-person, anti-tank, tunnel in turn), J demolition charge, U a machine-gun burst in
+## the dirt, I bullets on the van, L light flare, R red / T green signal flare, P a new squad where you look.
 
 var stage: BlastStage
 var hud: Label
 var seed_n := 1
 var help := true
+var mine_i := -1
 
 
 func _initialize() -> void:
 	stage = BlastStage.new()
 	root.add_child(stage)
 	stage.place_squad.call_deferred(Vector3(-28, 0, 22), Vector3.ZERO, 3)   # after the stage's _ready
+	stage.place_van.call_deferred(Vector3(14, 0, 8))
 	var input := InputNode.new()
 	input.test = self
 	root.add_child(input)
@@ -41,6 +45,8 @@ func _bench() -> void:
 		["size 8, 620 m", 8, 620.0, 16.0, "one"],
 		["size 8, 250 m (inside the dust)", 8, 250.0, 12.0, "one"],
 		["size 8 and a size-4 barrage, 620 m", 8, 620.0, 12.0, "both"],
+		["round B: light flare (shadows) over a barrage, 110 m", 0, 110.0, 10.0, "flare"],
+		["round B: 4 MG bursts, grenades and bullets on the van, 40 m", 0, 40.0, 6.0, "small"],
 	]
 	for night in [false, true]:
 		stage.set_night(night)
@@ -57,6 +63,16 @@ func _bench() -> void:
 					stage.fire(sc[1], Vector3.ZERO, 5)
 				"salvo":
 					key(KEY_X)
+				"flare":
+					stage.fire("flare_light", Vector3(10, 0, 0), 5)
+					for i in 24:
+						_later(stage.fire.bind([1, 2, 3, 4][i % 4], Vector3(randf_range(-40, 40), 0, randf_range(-40, 40)), 50 + i), 2.0 + float(i) * 0.25)
+				"small":
+					stage.target = Vector3(8, 1.5, 4)
+					for i in 4:
+						_later(key.bind(KEY_U), float(i) * 1.1)
+						_later(key.bind(KEY_G), float(i) * 1.3 + 0.4)
+						_later(key.bind(KEY_I), float(i) * 1.2 + 0.2)
 				"barrage", "both":
 					if String(sc[4]) == "both":
 						stage.fire(8, Vector3(0, 0, -150), 5)
@@ -99,7 +115,8 @@ func _process(_delta: float) -> bool:
 			Engine.get_frames_per_second(), ["faceted", "soft"][stage.style], "night" if stage.is_night else "day",
 			stage.blasts.size(), live]
 		if help:
-			hud.text += "\n1-8 fire a size where you look (1, 4, 8 tuned)   B faceted/soft   V both side by side   X salvo\nN day/night   C clear craters   K shake   H hide this   right drag turn, wheel zoom, WASD move"
+			hud.text += "\n1-8 fire a size where you look (1, 4, 8 tuned)   B faceted/soft   V both side by side   X salvo\nN day/night   C clear craters   K shake   H hide this   right drag turn, wheel zoom, WASD move
+G grenade   M mines (AP, AT, tunnel)   J demolition   U MG burst   I bullets on the van   L light flare   R / T signal flares   P new squad"
 	return false
 
 
@@ -125,6 +142,36 @@ func key(k: int) -> void:
 			var s: int = [1, 2, 1, 3, 4, 2, 1][i]
 			var at := stage.target + side * (float(i) - 3.0) * 9.0 + Vector3(randf_range(-3, 3), 0, randf_range(-6, 6))
 			_later(stage.fire.bind(s, at, seed_n * 13 + i), float(i) * 0.09)
+	# ---- round B kinds
+	elif k == KEY_G:
+		stage.fire("grenade", _near(4.0), seed_n)
+	elif k == KEY_M:
+		mine_i = (mine_i + 1) % 3
+		stage.fire(["mine_ap", "mine_at", "tunnel"][mine_i], _near(4.0), seed_n)
+		if mine_i == 2 and stage.dist < 140.0:
+			stage.dist = 170.0
+	elif k == KEY_J:
+		stage.fire("demo", _near(3.0), seed_n)
+	elif k == KEY_U:
+		# A machine-gun burst walking across the dirt.
+		var side := Vector3(cos(stage.yaw), 0, -sin(stage.yaw))
+		var start := stage.target - side * 6.0 + Vector3(randf_range(-2, 2), 0, randf_range(-2, 2))
+		for i in 14:
+			_later(stage.fire.bind("hit_dirt", start + side * float(i) * 0.9 + Vector3(randf_range(-0.6, 0.6), 0, randf_range(-0.6, 0.6)), seed_n * 31 + i), float(i) * 0.07)
+	elif k == KEY_I:
+		var rng := RandomNumberGenerator.new()
+		rng.seed = seed_n
+		for i in 10:
+			_later(stage.fire.bind("hit_metal", stage.van_side_point(rng), seed_n * 17 + i, -1, Vector3(1, 0.15, 0).normalized(), false), float(i) * 0.08)
+	elif k == KEY_L:
+		stage.fire("flare_light", _near(10.0), seed_n)
+	elif k == KEY_R:
+		stage.fire("flare_red", _near(10.0), seed_n)
+	elif k == KEY_T:
+		stage.fire("flare_green", _near(10.0), seed_n)
+	elif k == KEY_P:
+		stage.clear_men()
+		stage.place_squad(stage.target + Vector3(randf_range(-6, 6), 0, randf_range(-6, 6)), stage.target + Vector3(0, 0, -20), seed_n)
 	elif k == KEY_N:
 		stage.set_night(not stage.is_night)
 	elif k == KEY_C:
@@ -174,3 +221,7 @@ class InputNode:
 		if Input.is_key_pressed(KEY_E): st.yaw -= delta * 1.2
 		if mv != Vector3.ZERO:
 			st.target += mv.rotated(Vector3.UP, st.yaw) * delta * maxf(st.dist, 20.0) * 0.8
+
+
+func _near(r: float) -> Vector3:
+	return stage.target + Vector3(randf_range(-r, r), 0, randf_range(-r, r)) * 0.3

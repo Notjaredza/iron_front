@@ -10,6 +10,7 @@ var seed := 1
 var map_w := 1000
 var map_h := 1500
 var ready_map := false                 # tools wait for this
+var blasts: MapBlasts                  # explosions round B: blasts and craters on the map (F, G, V, 1-9)
 
 
 func _ready() -> void:
@@ -26,6 +27,10 @@ func _ready() -> void:
 	add_child(cam)
 	cam.current = true
 	view.cam = cam
+	blasts = MapBlasts.new()
+	add_child(blasts)
+	blasts.view = view
+	blasts.cam = cam
 	var layer := CanvasLayer.new()
 	add_child(layer)
 	hud = Label.new()
@@ -42,6 +47,8 @@ func _ready() -> void:
 
 func new_map(s: int) -> void:
 	seed = s
+	if blasts != null:
+		blasts.craters.clear()
 	view.build(seed, map_w, map_h)
 	cam.data = view.data
 	var sz := view.data.size_m()
@@ -69,5 +76,5 @@ func _process(_delta: float) -> void:
 	if not ready_map:
 		return
 	view.follow(cam.height)
-	hud.text = "Iron Front map test   seed %d   %s   %d FPS   height %d m\nWASD move, wheel zoom, Q/E turn, T day/night/fog, N new map" % [
-		seed, view.look_name(), Engine.get_frames_per_second(), int(cam.height)]
+	hud.text = "Iron Front map test   seed %d   %s   %d FPS   height %d m\nWASD move, wheel zoom, Q/E turn, T day/night/fog, N new map\n%s" % [
+		seed, view.look_name(), Engine.get_frames_per_second(), int(cam.height), blasts.help()]

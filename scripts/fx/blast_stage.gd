@@ -12,6 +12,9 @@ var ground: FxGround
 var cam: Camera3D
 var men: Array[Soldier] = []
 var blasts: Array = []                    # [Blast, start clock]
+var craters: Array = []                   # round B: craters still to cut [clock, point, radius, depth]
+var throws: Array[BlastThrow] = []        # round B: men caught by blasts
+var throw_rng := RandomNumberGenerator.new()
 var clock := 0.0
 var manual := false                       # true: the video tool moves the clock
 var is_night := false
@@ -53,6 +56,7 @@ func _ready() -> void:
 	cam.current = true
 	set_night(false)
 	Blast.set_wind(Vector2(2.6, 0.9))
+	BlastThrow.lib()                      # build the riflemen's clips now, not on the first throw
 
 
 func set_night(on: bool) -> void:
@@ -105,7 +109,25 @@ func place_squad(at: Vector3, look_at: Vector3, seed_value := 1) -> void:
 		s.rotation.y = yaw_s + PI + rng.randf_range(-0.25, 0.25)
 		add_child(s)
 		s.set_pose(poses[i])
+		s.set_meta("pose", poses[i])
 		men.append(s)
+
+
+## Round B: a goods van to shoot at (bullet hits on metal). Returns the point on its side facing +X and that normal.
+var van: Node3D
+
+
+func place_van(at: Vector3) -> void:
+	if van != null:
+		van.queue_free()
+	van = TrainParts.make("van")
+	van.position = at
+	add_child(van)
+
+
+## A random point on the van's +X side (sparks fly out along +X).
+func van_side_point(rng: RandomNumberGenerator) -> Vector3:
+	return van.position + Vector3(1.42, rng.randf_range(1.3, 3.0), rng.randf_range(-3.0, 3.0))
 
 
 func clear_men() -> void:
@@ -114,9 +136,11 @@ func clear_men() -> void:
 	men.clear()
 
 
-## Sets off a blast of this size at a ground point (its crater is made at once; the earth hides it).
-func fire(size: int, at: Vector3, seed_value: int, st := -1) -> Blast:
-	at.y = ground.height(at.x, at.z)
+## Sets off a blast at a ground point: a size 1-8, or a kind by name (BlastKinds.KINDS). Its crater is cut a moment
+## later (the earth hides it); men near it are thrown. on_ground false: at is used as given (a hit on a wagon side).
+func fire(what: Variant, at: Vector3, seed_value: int, st := -1, nrm := Vector3.UP, on_ground := true) -> Blast:
+	if on_ground:
+		at.y = ground.height(at.x, at.z)
 	var b := Blast.new()
 	b.auto = false
 	add_child(b)
@@ -126,9 +150,20 @@ func fire(size: int, at: Vector3, seed_value: int, st := -1) -> Blast:
 		for c: int in (e[0] as Blast).spec["counts"]:
 			live += c
 	b.density = clampf(1.0 - float(live - 5000) / 14000.0, 0.4, 1.0)
-	b.setup(size, at, seed_value, style if st < 0 else st)
+	b.setup(what, at, seed_value, style if st < 0 else st, nrm)
 	blasts.append([b, clock])
-	ground.crater(at, float(b.spec["crater_r"]), float(b.spec["crater_d"]))
+	if on_ground and float(b.spec["crater_r"]) > 0.0:
+		craters.append([clock + float(b.spec.get("crater_t", 0.05)), at, float(b.spec["crater_r"]), float(b.spec["crater_d"])])
+	throw_rng.seed = seed_value * 7 + 3
+	for m in men:
+		var busy := false
+		for th in throws:
+			busy = busy or th.man == m
+		if busy or not is_instance_valid(m):
+			continue
+		var th := BlastThrow.make(m, b.spec, at, clock, throw_rng, ground.height, m.get_meta("pose", "aim"))
+		if th != null:
+			throws.append(th)
 	return b
 
 
@@ -136,6 +171,8 @@ func clear_blasts() -> void:
 	for e: Array in blasts:
 		(e[0] as Blast).queue_free()
 	blasts.clear()
+	craters.clear()
+	throws.clear()
 
 
 func _process(delta: float) -> void:
@@ -155,6 +192,19 @@ func step(c: float) -> void:
 		else:
 			keep.append(e)
 	blasts = keep
+	var later: Array = []
+	for cr: Array in craters:
+		if clock >= float(cr[0]):
+			# The test field's grid is 1.5 m, too coarse for a grenade's pit: small ones only scorch it.
+			ground.crater(cr[1], cr[2], cr[3] if float(cr[2]) >= 1.2 else 0.0)
+		else:
+			later.append(cr)
+	craters = later
+	var going: Array[BlastThrow] = []
+	for th in throws:
+		if is_instance_valid(th.man) and th.step(clock):
+			going.append(th)
+	throws = going
 	_place_cam()
 
 
