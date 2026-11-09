@@ -392,9 +392,10 @@ var _men: Array[Dictionary] = []
 
 
 ## A soldier standing at a point of the building (building frame), facing yaw, posed by spec once in the tree.
-## hands: optional {"hand_r": local point, "hand_l": local point} turned to world points at pose time.
-func add_man(at: Vector3, yaw: float, spec: Dictionary, seed_value := 1, hands := {}) -> Soldier:
-	var s := Soldier.new().setup(seed_value)
+## hands: optional {"hand_r": local point, "hand_l": local point} turned to world points at pose time, or a
+## Callable returning world points (called once the building is in the tree). role picks the troop's kit.
+func add_man(at: Vector3, yaw: float, spec: Dictionary, seed_value := 1, hands: Variant = {}, role := "") -> Soldier:
+	var s := Soldier.new().setup(seed_value, 0, role)
 	s.position = at
 	s.rotation.y = yaw
 	parts.add_child(s)
@@ -410,8 +411,11 @@ func _ready() -> void:
 
 
 func _pose_man(m: Dictionary) -> void:
-	var hands: Dictionary = m["hands"]
 	var wh := {}
-	for k: String in hands:
-		wh[k] = to_global(hands[k] as Vector3)
+	if m["hands"] is Callable:
+		wh = (m["hands"] as Callable).call()
+	else:
+		var hands: Dictionary = m["hands"]
+		for k: String in hands:
+			wh[k] = to_global(hands[k] as Vector3)
 	(m["s"] as Soldier).pose_spec_world(m["spec"], wh)

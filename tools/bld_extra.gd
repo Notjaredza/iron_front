@@ -2,7 +2,7 @@ extends RefCounted
 ## Iron Front buildings: the extra stills (walls, gates, defences, the base overview) for bld_pictures.gd.
 
 const SHOTS: Array[String] = ["walls_pieces", "walls_base_day", "walls_base_night", "walls_rail_gate", "walls_cliff",
-	"walls_stages"]
+	"walls_stages", "defences_line", "defences_crews", "defences_belt_night", "base_overview_day", "base_overview_night"]
 
 var m: Object
 
@@ -89,6 +89,50 @@ func shot(main: Object, nm: String) -> void:
 			(list[6] as Building).set_damage(2)
 			m.run(list, 2.0)
 			m.look(Vector3(0, 20, -52), Vector3(0, 2, 0), 55)
+		"defences_line":
+			var list := _front(Vector3.ZERO, false)
+			m.run(list, 1.0)
+			m.look(Vector3(-30, 30, -58), Vector3(24, 0, -14), 50)
+		"defences_belt_night":
+			m.night()
+			var list := _front(Vector3.ZERO, true)
+			m.run(list, 1.0)
+			m.look(Vector3(-30, 30, -58), Vector3(24, 0, -14), 50)
+		"defences_crews":
+			var list: Array = []
+			for k in 4:
+				var kind := "mg_nest" if k < 2 else "gun_pit"
+				var b := Buildings.make(kind)
+				m.stage.add_child(b)
+				b.position = Vector3([-15.0, -5.0, 6.0, 24.0][k], 0, 0)
+				if k % 2 == 1:
+					BldDefences.set_crew(b, false)
+				list.append(b)
+			await m.process_frame
+			m.run(list, 1.0)
+			m.look(Vector3(-6, 22, -26), Vector3(4, 0, 0), 50)
+		"base_overview_day", "base_overview_night":
+			var night: bool = nm.ends_with("night")
+			if night:
+				m.night()
+			var list := _base(Vector3.ZERO, night)
+			list.append_array(_front(Vector3.ZERO, night))
+			for e: Array in [["barracks", Vector3(34, 0, 30), PI * 0.5], ["lamp_tower", Vector3(-8, 0, 6), 0.0],
+					["telegraph", Vector3(-8, 0, 18), 0.0], ["pigeon_loft", Vector3(-8, 0, 30), 0.0],
+					["wreck_yard", Vector3(-30, 0, 22), 0.0], ["lab_comms", Vector3(-30, 0, 46), 0.0],
+					["station", Vector3(72, 0, 10.6), 0.0], ["water_tower", Vector3(92, 0, 13.2), 0.0],
+					["signal_box", Vector3(58, 0, 13.1), 0.0], ["coal_stage", Vector3(100, 0, 18.6), PI],
+					["lab_weapons", Vector3(14, 0, 56), 0.0], ["lab_rail", Vector3(64, 0, 34), PI]]:
+				var b := Buildings.make(e[0])
+				m.stage.add_child(b)
+				b.position = e[1]
+				b.rotation.y = e[2]
+				b.set_lights(night)
+				list.append(b)
+			_train(Vector3(78, 0, 16), PI * 0.5)
+			await m.process_frame
+			m.run(list, 1.5)
+			m.look(Vector3(-58, 70, -86), Vector3(26, 0, 14), 52)
 
 
 ## A walled compound: 7 x 6 cells, a tower and a bastion on two corners, towers half way, a road gate on
@@ -162,3 +206,43 @@ func _train(at: Vector3, yaw: float) -> void:
 		var fwd := Basis(Vector3.UP, yaw) * Vector3(0, 0, 1)
 		car.position = at + Vector3(0, 0.37, 0) + fwd * (z + car.length() * 0.5)
 		z += car.length() + 0.6
+
+
+## A front line north of the base: a sandbag line dragged along with bent ends, two MG nests in it, a gun
+## pit behind the west end, and a belt of wire, coils, hedgehogs and teeth out in front.
+func _front(at: Vector3, night: bool) -> Array:
+	var list: Array = []
+	var cells := {}
+	for x in range(-1, 8):
+		cells[Vector2i(x, -2)] = true
+	cells[Vector2i(-1, -1)] = true
+	cells[Vector2i(7, -1)] = true
+	var sol := BldWalls.solve(cells)
+	for c: Vector2i in sol:
+		if c == Vector2i(1, -2) or c == Vector2i(5, -2):
+			continue
+		var b := BldDefences.line(sol[c][0])
+		m.stage.add_child(b)
+		b.position = at + Vector3(float(c.x) * 8.0, 0, float(c.y) * 8.0)
+		list.append(b)
+	for x: int in [1, 5]:
+		var nest := Buildings.make("mg_nest")
+		m.stage.add_child(nest)
+		nest.position = at + Vector3(float(x) * 8.0, 0, -16.0)
+		list.append(nest)
+	var pit := Buildings.make("gun_pit")
+	m.stage.add_child(pit)
+	pit.position = at + Vector3(-16, 0, -4)
+	list.append(pit)
+	for x in range(-1, 8):
+		var kinds := ["wire_belt", "concertina"]
+		var k1: String = kinds[x & 1]
+		for row in 2:
+			var kind := k1 if row == 0 else ("teeth" if x % 3 != 0 else "hedgehogs")
+			var b := Buildings.make(kind)
+			m.stage.add_child(b)
+			b.position = at + Vector3(float(x) * 8.0, 0, -28.0 - float(row) * 8.0)
+			list.append(b)
+	for b: Building in list:
+		b.set_lights(night)
+	return list

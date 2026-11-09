@@ -5,7 +5,7 @@ extends RefCounted
 ## collapse chunks and the far look. Each op has a tier:
 ##   0 ground and foundations, 1 walls and structure, 2 roofs, 3 small details
 ## and an optional tag: "glow" (windows and lamps: drawn in the emissive Glow mesh), "detail" (left out
-## of the far look), "keep" (never dropped by damage).
+## of the far look), "keep" (never dropped by damage or the far filter), "far" (a stand-in drawn only in the far look).
 ## Shapes use TrainGeo's calls (box with half sizes, cyl, extrude, lump), all in the building's frame:
 ## the ground at y = 0, the footprint centred on the origin.
 
@@ -101,6 +101,8 @@ func replay(g: TrainGeo, mode: String, chunk := -1, seed_value := 0) -> void:
 		var tg: String = o["tag"]
 		var col: Color = o["col"]
 		var r := _h(i, seed_value)
+		if tg == "far" and mode != "far":
+			continue
 		match mode:
 			"full":
 				if tg == "glow":
@@ -144,9 +146,9 @@ func replay(g: TrainGeo, mode: String, chunk := -1, seed_value := 0) -> void:
 			"far":
 				if tr >= 3 or tg == "detail":
 					continue
-				if tg != "keep" and o["t"] == "box" and (o["h"] as Vector3).x * (o["h"] as Vector3).y * (o["h"] as Vector3).z < 0.2:
+				if tg != "keep" and tg != "far" and o["t"] == "box" and (o["h"] as Vector3).x * (o["h"] as Vector3).y * (o["h"] as Vector3).z < 0.2:
 					continue
-				if tg != "keep" and o["t"] == "cyl" and (o["r"] as float) < 0.2:
+				if tg != "keep" and tg != "far" and o["t"] == "cyl" and (o["r"] as float) < 0.2:
 					continue
 				if o["t"] == "lump":
 					continue

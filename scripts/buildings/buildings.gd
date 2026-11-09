@@ -22,10 +22,19 @@ const KINDS := {
 	"lab_rail": [Vector2i(3, 2), "research"],
 	"lab_defences": [Vector2i(2, 2), "research"],
 	"wreck_yard": [Vector2i(3, 3), "research"],
+	"sandbag_line": [Vector2i(1, 1), "defences"],
+	"wire_belt": [Vector2i(1, 1), "defences"],
+	"concertina": [Vector2i(1, 1), "defences"],
+	"hedgehogs": [Vector2i(1, 1), "defences"],
+	"teeth": [Vector2i(1, 1), "defences"],
+	"mg_nest": [Vector2i(1, 1), "defences"],
+	"gun_pit": [Vector2i(2, 2), "defences"],
 }
 
 
 static func make(kind: String) -> Building:
+	if kind == "sandbag_line":
+		return BldDefences.line(BldWalls.N | BldWalls.S)
 	var b := Building.new()
 	b.kind = kind
 	b.name = kind.capitalize().replace(" ", "")
@@ -67,6 +76,18 @@ static func make(kind: String) -> Building:
 			BldResearch.lab_defences(b)
 		"wreck_yard":
 			BldResearch.wreck_yard(b)
+		"wire_belt":
+			BldDefences.wire_belt(b)
+		"concertina":
+			BldDefences.concertina(b)
+		"hedgehogs":
+			BldDefences.hedgehogs(b)
+		"teeth":
+			BldDefences.teeth(b)
+		"mg_nest":
+			BldDefences.mg_nest(b)
+		"gun_pit":
+			BldDefences.gun_pit(b)
 	b.finish()
 	return b
 
