@@ -62,7 +62,8 @@ static func ring(c: Vector3, rx: Vector3, ry: Vector3, hw: float, hd: float, sid
 
 ## A tube through the centres cs, with half sizes sz (x along the hint side, y across).
 ## color2, if given, alternates with color on the side faces (helmet net).
-func loft(cs: Array, sz: Array, hint: Vector3, sides: int, ch: float, color: Color, b_id: int, color2: Variant = null, caps := true) -> void:
+## caps: 1 = start end, 2 = far end, 3 = both, 0 = open (hidden joints).
+func loft(cs: Array, sz: Array, hint: Vector3, sides: int, ch: float, color: Color, b_id: int, color2: Variant = null, caps := 3) -> void:
 	var n := cs.size()
 	if n < 2:
 		return
@@ -111,10 +112,11 @@ func loft(cs: Array, sz: Array, hint: Vector3, sides: int, ch: float, color: Col
 			else:
 				emit(p00, p01, p11, c, b_id)
 				emit(p00, p11, p10, c, b_id)
-	if caps:
-		for j in m:
-			var j1 := (j + 1) % m
+	for j in m:
+		var j1 := (j + 1) % m
+		if caps & 1:
 			tri_out(cs[0], rings[0][j], rings[0][j1], color, b_id, cs[1])
+		if caps & 2:
 			tri_out(cs[n - 1], rings[n - 1][j], rings[n - 1][j1], color, b_id, cs[n - 2])
 
 

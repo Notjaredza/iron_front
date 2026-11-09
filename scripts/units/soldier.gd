@@ -5,7 +5,7 @@ extends Node3D
 ## the pose, and both arms reach the rifle by two-bone IK. The figure is then set
 ## on the ground by its lowest point.
 
-const B := SoldierBuilder
+const B := preload("res://scripts/units/soldier_builder.gd")
 const DEG := PI / 180.0
 const POSE_NAMES: Array[String] = ["stand", "run", "kneel", "aim", "prone"]
 
@@ -86,26 +86,26 @@ static func pose_spec(pose_name: String) -> Dictionary:
 			return {
 				"rot": {B.HIPS: Vector3(0, -28, 0), B.THIGH_R: Vector3(-8, 0, 4), B.SHIN_R: Vector3(-85, 0, 0),
 					B.FOOT_R: Vector3(55, 0, 0), B.THIGH_L: Vector3(82, 22, -4), B.SHIN_L: Vector3(-84, 0, 0),
-					B.FOOT_L: Vector3(2, 0, 0), B.SPINE: Vector3(-6, 0, 0), B.CHEST: Vector3(-4, 0, 0),
-					B.NECK: Vector3(4, 18, 0), B.HEAD: Vector3(8, 12, -10)},
+					B.FOOT_L: Vector3(2, 0, 0), B.SPINE: Vector3(-9, 0, 0), B.CHEST: Vector3(-5, -8, 0),
+					B.NECK: Vector3(-10, 16, 0), B.HEAD: Vector3(-8, 10, -14)},
 				"rifle": {"mode": "aim", "dir": Vector3(0, -0.03, -1)},
-				"hand_r": B.GRIP_R, "pole_r": Vector3(0.4, -0.3, 0.25),
-				"hand_l": B.GRIP_L, "pole_l": Vector3(-0.1, -0.7, -0.1),
+				"hand_r": B.GRIP_R, "pole_r": Vector3(0.6, 0.05, 0.1),
+				"hand_l": B.GRIP_L, "pole_l": Vector3(-0.05, -0.8, 0.05),
 			}
 		"aim":
 			return {
 				"rot": {B.HIPS: Vector3(0, -25, 0), B.THIGH_R: Vector3(-4, 0, 5), B.SHIN_R: Vector3(-2, 0, 0),
-					B.THIGH_L: Vector3(10, 20, -4), B.SHIN_L: Vector3(-6, 0, 0), B.SPINE: Vector3(-5, 0, 0),
-					B.CHEST: Vector3(-3, 0, 0), B.NECK: Vector3(3, 15, 0), B.HEAD: Vector3(6, 12, -10)},
+					B.THIGH_L: Vector3(10, 20, -4), B.SHIN_L: Vector3(-6, 0, 0), B.SPINE: Vector3(-8, 0, 0),
+					B.CHEST: Vector3(-4, -8, 0), B.NECK: Vector3(-10, 14, 0), B.HEAD: Vector3(-8, 10, -14)},
 				"rifle": {"mode": "aim", "dir": Vector3(0, -0.01, -1)},
-				"hand_r": B.GRIP_R, "pole_r": Vector3(0.4, -0.3, 0.25),
-				"hand_l": B.GRIP_L, "pole_l": Vector3(-0.1, -0.7, -0.1),
+				"hand_r": B.GRIP_R, "pole_r": Vector3(0.6, 0.05, 0.1),
+				"hand_l": B.GRIP_L, "pole_l": Vector3(-0.05, -0.8, 0.05),
 			}
 		"prone":
 			return {
 				"root_rot": Vector3(-90, 0, 0), "root_pos": Vector3(0, 0, 0.95),
-				"rot": {B.THIGH_R: Vector3(0, 0, 9), B.THIGH_L: Vector3(0, 0, -9), B.FOOT_R: Vector3(-70, 0, 0),
-					B.FOOT_L: Vector3(-70, 0, 0), B.SPINE: Vector3(14, 0, 0), B.CHEST: Vector3(16, 0, 0),
+				"rot": {B.THIGH_R: Vector3(0, 0, 9), B.THIGH_L: Vector3(0, 0, -9), B.FOOT_R: Vector3(0, -15, 0),
+					B.FOOT_L: Vector3(0, 15, 0), B.SPINE: Vector3(14, 0, 0), B.CHEST: Vector3(16, 0, 0),
 					B.NECK: Vector3(30, 0, 0), B.HEAD: Vector3(22, 0, -6)},
 				"rifle": {"mode": "aim", "dir": Vector3(0, 0.0, -1)},
 				"hand_r": B.GRIP_R, "pole_r": Vector3(0.35, -0.6, 0.0),
@@ -154,7 +154,7 @@ func _rifle_xf(r: Dictionary, g: Array[Transform3D]) -> Transform3D:
 			var loc := Transform3D(bas, (r["grip"] as Vector3) - bas * B.GRIP_R)
 			return g[B.CHEST] * loc
 		"aim":
-			var butt := g[B.CHEST] * Vector3(0.12, 0.17, -0.11)
+			var butt := g[B.CHEST] * Vector3(0.12, 0.215, -0.10)
 			var bas := Basis.looking_at((r["dir"] as Vector3).normalized(), Vector3.UP)
 			return Transform3D(bas, butt - bas * B.BUTT)
 		_:
