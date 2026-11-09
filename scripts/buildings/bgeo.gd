@@ -141,9 +141,9 @@ func replay(g: TrainGeo, mode: String, chunk := -1, seed_value := 0) -> void:
 			"far":
 				if tr >= 3 or tg == "detail":
 					continue
-				if o["t"] == "box" and (o["h"] as Vector3).x * (o["h"] as Vector3).y * (o["h"] as Vector3).z < 0.2:
+				if tg != "keep" and o["t"] == "box" and (o["h"] as Vector3).x * (o["h"] as Vector3).y * (o["h"] as Vector3).z < 0.2:
 					continue
-				if o["t"] == "cyl" and (o["r"] as float) < 0.2:
+				if tg != "keep" and o["t"] == "cyl" and (o["r"] as float) < 0.2:
 					continue
 				if o["t"] == "lump":
 					continue

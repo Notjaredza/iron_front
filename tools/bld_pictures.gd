@@ -157,12 +157,14 @@ func _shot(nm: String) -> void:
 		var k := nm.substr(0, nm.rfind("_"))
 		var b := add(k)
 		var sz := float(maxi(b.tiles.x, b.tiles.y)) * 8.0
+		var tall := b.body.get_aabb().size.y
+		sz = maxf(sz, tall * 1.6)
 		if nm.ends_with("_night"):
 			night()
 			b.set_lights(true)
 		await process_frame
 		run([b], 2.5)
-		look(Vector3(-sz * 0.95, sz * 0.62, -sz * 1.05), Vector3(0, sz * 0.12, 0), 50)
+		look(Vector3(-sz * 0.95, sz * 0.62, -sz * 1.05), Vector3(0, maxf(sz * 0.12, tall * 0.4), 0), 50)
 	elif nm.ends_with("_stages") and Buildings.KINDS.has(nm.substr(0, nm.rfind("_"))):
 		var k := nm.substr(0, nm.rfind("_"))
 		var sz: Vector2i = Buildings.KINDS[k][0]
