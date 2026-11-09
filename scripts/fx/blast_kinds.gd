@@ -163,6 +163,8 @@ static func build(kind: String, at: Vector3, seed_value: int, density := 1.0, nr
 			_fire(b, at, 2, 0.22, 0.05, 0.0)
 			b.merge({"flash": 1.6, "light_range": 4.0, "fire_h": 0.0, "glow_r": 0.6, "fire_life": 0.05,
 				"total": 2.0, "reach": 6.0, "top": 6.0}, true)
+		"musket", "pan":
+			_musket(b, kind, at, nrm, density)
 		_:
 			if kind.begins_with("flare"):
 				_flare(b, kind, at, rng)
@@ -303,3 +305,45 @@ static func flare_pos(f: Dictionary, t: float) -> Vector3:
 	p += Vector3(sin(s * 1.3), 0, cos(s * 1.1)) * sway
 	p.y = maxf(p.y, at.y + 0.3)
 	return p
+
+
+## Red jackets (2026-11-10): black powder. "musket": the shot, nrm along the barrel: a tongue of flame, then a thick
+## bank of white smoke driven out a few metres, slowing, swelling, hanging for many seconds and drifting off; a
+## volley of a whole line makes one wall of it. "pan": the flash in the pan, a small puff jumping up by the lock.
+static func _musket(b: Dictionary, kind: String, at: Vector3, nrm: Vector3, density: float) -> void:
+	var rng := S.rng
+	var d := nrm.normalized()
+	var n := func(x: float) -> int: return maxi(int(x * density), 2)
+	var smoke_col := func() -> Color:
+		var v := rng.randf_range(-0.04, 0.03)
+		return Color(0.80 + v, 0.80 + v, 0.78 + v, 1.0)
+	if kind == "pan":
+		for i in 3:
+			var target := at + Vector3(0, rng.randf_range(0.08, 0.18), 0) + S._ball() * 0.05
+			S._add(b["fire"], at, (target - at) * 14.0, 0.0, 0.06, 14.0, 0.0, 0.02, rng.randf_range(0.04, 0.07),
+				Color(1, 1, 1, 1), 0.0, 0.0, 0.6)
+		for i in n.call(7):
+			var target := at + Vector3(0, rng.randf_range(0.2, 0.55), 0) + S._ball() * 0.12
+			var s1 := rng.randf_range(0.06, 0.13)
+			S._add(b["smoke"], at, (target - at) * 5.0, rng.randf_range(0.0, 0.03), rng.randf_range(2.0, 3.5), 5.0, 0.12,
+				s1 * 0.3, s1, smoke_col.call(), rng.randf_range(-1, 1), 0.8, 1.0)
+		b.merge({"flash": 1.2, "light_range": 3.0, "fire_h": 0.1, "glow_r": 0.3, "fire_life": 0.06, "total": 4.0,
+			"reach": 3.0, "top": 2.0}, true)
+		return
+	# The flame: a short hot tongue out of the muzzle.
+	for i in n.call(7):
+		var reach := rng.randf_range(0.25, 0.9)
+		var target := at + d * reach + S._ball() * 0.12
+		var s1 := rng.randf_range(0.09, 0.2) * (1.2 - reach * 0.5)
+		S._add(b["fire"], at, (target - at) * 16.0, rng.randf_range(0.0, 0.01), rng.randf_range(0.05, 0.1), 16.0, 0.0,
+			s1 * 0.3, s1, Color(1, 1, 1, 1), rng.randf_range(-2, 2), 0.0, 1.0 - reach)
+	# The bank of smoke: thrown out along the barrel (the furthest blobs the biggest), then hanging and rising slowly.
+	for i in n.call(44):
+		var f := pow(rng.randf(), 0.7)
+		var target := at + d * (0.3 + 3.2 * f) + S._ball() * (0.15 + 0.45 * f) + Vector3(0, 0.15 * f, 0)
+		var k := rng.randf_range(2.6, 3.6)
+		var s1 := rng.randf_range(0.14, 0.3) * (0.5 + 1.3 * f)
+		S._add(b["smoke"], at + d * 0.05, (target - at) * k, rng.randf_range(0.0, 0.06), rng.randf_range(7.0, 12.0), k, 0.05,
+			s1 * 0.25, s1, smoke_col.call(), rng.randf_range(-0.4, 0.4), 0.8, 1.0)
+	b.merge({"flash": 3.0, "light_range": 7.0, "fire_h": 0.2, "glow_r": 0.8, "fire_life": 0.08, "total": 13.0,
+		"reach": 8.0, "top": 4.0, "crater_r": 0.0}, true)

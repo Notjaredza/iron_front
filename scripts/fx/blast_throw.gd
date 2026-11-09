@@ -98,9 +98,9 @@ func step(c: float) -> bool:
 	var a := c - t_start
 	if a < 0.0:
 		return true
-	var L := lib()
+	var L := _mlib()
 	var b := Basis(Vector3.UP, yaw)
-	var down: Dictionary = L[death]
+	var down: Dictionary = L[_n(death)]
 	if t_fly > 0.0 and a < t_fly:
 		# In the air: ballistic, tumbling about his middle, body buckled the way he will land.
 		var u := a / t_fly
@@ -135,7 +135,7 @@ func step(c: float) -> bool:
 		_show(death, dl)
 		return true
 	var b2 := Basis(Vector3.UP, yaw + (PI if facing else 0.0))
-	var up: Dictionary = L["prone_to_stand"]
+	var up: Dictionary = L[_n("prone_to_stand")]
 	var su := s2 - roll_t
 	if not _anchored:
 		# Keep the hips where they lay when the get-up clip takes over.
@@ -163,10 +163,19 @@ func _show(clip: String, t: float) -> void:
 	if key == _key:
 		return
 	_key = key
-	man.show_globals(Anim.sample(lib()[clip], t, man.geo))
+	man.show_globals(Anim.sample(_mlib()[_n(clip)], t, man.geo))
 
 
 func _lying(dl: float) -> Array[Transform3D]:
 	if _lie.is_empty():
-		_lie = Anim.sample(lib()[death], dl, man.geo)
+		_lie = Anim.sample(_mlib()[_n(death)], dl, man.geo)
 	return _lie
+
+
+## Red jackets (2026-11-10): a man with his own clip set (Redcoat) plays his own deaths and get-up.
+func _mlib() -> Dictionary:
+	return man.clip_lib() if man.has_method("clip_lib") else lib()
+
+
+func _n(base: String) -> String:
+	return man.clip_name(base) if man.has_method("clip_name") else base
