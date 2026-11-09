@@ -125,7 +125,7 @@ The laptop was shared with other chats' renders tonight. This run was made from 
 - **Thrown men only re-solve their pose when it changes**, so a field of fallen men costs nothing.
 - **Bullets and grenades are cheap.**
 
-## Not done / for later
+## IMPORTANT, still to do (the user marked these important, 2026-11-09)
 - Water: blasts on rivers go off but make no splash and no crater.
 - Grass tufts from the map's scatter still show inside craters.
 - Bullet hits are one small node each. That's fine for the test; real MG fire in battle should pool them.
