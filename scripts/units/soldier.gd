@@ -82,21 +82,44 @@ func show_globals(g: Array[Transform3D]) -> void:
 	Anim.apply(skel, g)
 
 
-## Poses from a spec. world_hands: "hand_r"/"hand_l" -> a world point the palm must reach
-## (solved twice so the ground lift does not pull the hands off their marks).
+## Poses from a spec. world_hands: "hand_r"/"hand_l" -> a world point the palm must reach.
 func pose_spec_world(spec: Dictionary, world_hands := {}) -> void:
-	var p := spec.duplicate(true)
+	pose_blend_world(spec, spec, 0.0, world_hands, world_hands)
+
+
+## Blends spec a into b at u, with hands on world points (ha for a, hb for b).
+## Solved twice so the ground lift does not pull the hands off their marks.
+## Returns the model-space pose it set.
+func pose_blend_world(a: Dictionary, b: Dictionary, u: float, ha := {}, hb := {}, ground := true) -> Array[Transform3D]:
+	var pa := a.duplicate()
+	var pb := b.duplicate()
 	var lift_y := 0.0
+	var inv := global_transform.affine_inverse()
+	var g: Array[Transform3D]
 	for it in 2:
-		for k in world_hands:
-			var m := global_transform.affine_inverse() * (world_hands[k] as Vector3)
-			p[k] = [-1, m - Vector3(0, lift_y, 0)]
-		var g := Rig.solve(p, p, 0.0)
-		lift_y = Rig.ground_lift(g, geo)
-		if it == 1 or world_hands.is_empty():
-			Rig.lift(g, lift_y)
-			Anim.apply(skel, g)
-			return
+		for k in ha:
+			pa[k] = [-1, inv * (ha[k] as Vector3) - Vector3(0, lift_y, 0)]
+		for k in hb:
+			pb[k] = [-1, inv * (hb[k] as Vector3) - Vector3(0, lift_y, 0)]
+		g = Rig.solve(pa, pb, u)
+		if not ground:
+			break
+		var l2 := Rig.ground_lift(g, geo)
+		if it == 1 or (ha.is_empty() and hb.is_empty()):
+			Rig.lift(g, l2)
+			break
+		lift_y = l2
+	Anim.apply(skel, g)
+	return g
+
+
+## A spec with its world hands turned into this soldier's model space (for clips).
+func spec_local(spec: Dictionary, world_hands: Dictionary, lift_y := 0.0) -> Dictionary:
+	var p := spec.duplicate()
+	var inv := global_transform.affine_inverse()
+	for k in world_hands:
+		p[k] = [-1, inv * (world_hands[k] as Vector3) - Vector3(0, lift_y, 0)]
+	return p
 
 
 ## Hangs a prop on a bone (its frame: the bone's joint, rest-aligned axes).

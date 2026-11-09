@@ -76,31 +76,62 @@ static func gun(lod := 0) -> UnitGeo:
 
 ## The tripod set up (open) or folded for carrying.
 static func tripod(folded := false, lod := 0) -> UnitGeo:
+	return tripod_at(0.0 if folded else 1.0, lod)
+
+
+## The tripod part way open: 0 = folded flat (legs together along Z), 1 = set up.
+static func tripod_at(open: float, lod := 0) -> UnitGeo:
 	var g := UnitGeo.new()
-	var top := Vector3(0, PIN_H - 0.08, 0)
-	var feet: Array[Vector3]
-	if folded:
-		top = Vector3(0, 0.0, 0)
-		feet = [Vector3(0, 0.0, -0.75), Vector3(0.05, 0.0, 0.7), Vector3(-0.05, 0.0, 0.7)]
-	else:
-		feet = [Vector3(0, 0.0, -0.62), Vector3(0.42, 0.0, 0.5), Vector3(-0.42, 0.0, 0.5)]
+	var o := clampf(open, 0.0, 1.0)
+	var top := Vector3(0, 0.03, 0).lerp(Vector3(0, PIN_H - 0.08, 0), o)
+	var f0: Array[Vector3] = [Vector3(0, 0.03, -0.75), Vector3(0.05, 0.03, 0.7), Vector3(-0.05, 0.03, 0.7)]
+	var f1: Array[Vector3] = [Vector3(0, 0.0, -0.62), Vector3(0.42, 0.0, 0.5), Vector3(-0.42, 0.0, 0.5)]
 	var ls := 6 if lod == 0 else 4
-	for f in feet:
-		g.loft([top, f], [Vector2(0.022, 0.022), Vector2(0.017, 0.017)], Vector3.UP if not folded else Vector3.RIGHT,
+	for i in 3:
+		var f := f0[i].lerp(f1[i], o)
+		g.loft([top, f], [Vector2(0.022, 0.022), Vector2(0.017, 0.017)], Vector3.UP if o > 0.2 else Vector3.RIGHT,
 			ls, 0.0, STEEL, 0)
-		if not folded:
+		if o > 0.9:
 			g.box(f + Vector3(0, 0.012, 0), Vector3(0.035, 0.012, 0.035), STEEL_DARK, 0)  # foot pad
-	# The head: crosshead, pintle, and the cradle the trunnion pin sits in.
 	g.box(top, Vector3(0.08, 0.035, 0.07), STEEL_DARK, 0, Basis(), 0.25 if lod == 0 else 0.0)
-	if not folded:
-		g.loft([top, Vector3(0, PIN_H - 0.03, 0)], [Vector2(0.03, 0.03), Vector2(0.03, 0.03)], Vector3.RIGHT, 6, 0.0, STEEL, 0)
+	if o > 0.6:
+		var ph := top.y + 0.08
+		g.loft([top, Vector3(0, ph - 0.03, 0)], [Vector2(0.03, 0.03), Vector2(0.03, 0.03)], Vector3.RIGHT, 6, 0.0, STEEL, 0)
 		for s: float in [1.0, -1.0]:
-			g.box(Vector3(0.05 * s, PIN_H - 0.02, 0), Vector3(0.012, 0.04, 0.04), STEEL_DARK, 0)
-		# Traverse arc at the back.
+			g.box(Vector3(0.05 * s, ph - 0.02, 0), Vector3(0.012, 0.04, 0.04), STEEL_DARK, 0)
 		if lod == 0:
 			g.loft([Vector3(0.2, top.y - 0.02, 0.14), Vector3(0, top.y - 0.02, 0.2), Vector3(-0.2, top.y - 0.02, 0.14)],
 				[Vector2(0.012, 0.006), Vector2(0.012, 0.006), Vector2(0.012, 0.006)], Vector3.UP, 4, 0.0, STEEL_DARK, 0)
 	return g
+
+
+## A length of belt through the given points (canvas with brass rounds), for the feed.
+static func belt(points: PackedVector3Array) -> UnitGeo:
+	var g := UnitGeo.new()
+	for i in points.size() - 1:
+		var a := points[i]
+		var b := points[i + 1]
+		var d := b - a
+		var n := maxi(1, int(d.length() / 0.035))
+		var dir := d.normalized()
+		var side := dir.cross(Vector3.UP)
+		if side.length_squared() < 1e-4:
+			side = Vector3.RIGHT
+		var bas := Basis(side.normalized(), dir, side.normalized().cross(dir)).orthonormalized()
+		for k in n:
+			var p := a + d * ((float(k) + 0.5) / float(n))
+			g.box(p, Vector3(0.03, 0.012, 0.004), CANVAS, 0, bas)
+			g.box(p + bas.z * 0.006, Vector3(0.026, 0.006, 0.006), BRASS, 0, bas)
+	return g
+
+
+## A sagging curve from a to b (for the belt).
+static func sag(a: Vector3, b: Vector3, drop: float, n := 8) -> PackedVector3Array:
+	var out := PackedVector3Array()
+	for i in n + 1:
+		var u := float(i) / float(n)
+		out.append(a.lerp(b, u) + Vector3(0, -drop * 4.0 * u * (1.0 - u), 0))
+	return out
 
 
 static func ammo_box(open := false) -> UnitGeo:

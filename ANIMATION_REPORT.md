@@ -43,3 +43,23 @@ Pictures in results/units/mg/: mg_gun.png (4 views, one with the shield), mg_par
 - Crew roles in `SoldierBuilder.look_for_role`: gunner (no rifle, no pack, holster, gloves), loader (no rifle, pack, holster, gloves), carriers (rifle slung, pack, boxes), NCO (no rifle, holster, binoculars, map case, sergeant's stripes). Crew 894 to 1214 tris.
 - New: rifle slung on the back (rig "back" mode), `Soldier.pose_spec_world` (hands to world points), `Soldier.attach` (props on bones).
 - The team poses in the pictures are rough stand-ins; the real moves come in step 2.
+
+## Step 2: moves (started 21:44 2026-11-09 on "Looks good, do moves"; ETA about 2 to 3 h)
+
+Videos ready 21:54 2026-11-09, in results/units/anim/:
+
+- **mg_march.mp4**: the six walking with their loads, then the heavier loaded run. Gun on the gunner's
+  shoulder, tripod on the loader's, carriers with two boxes each, the NCO free. Steps are out of step on purpose.
+- **mg_setup.mp4**: tripod down and unfolded, gun lifted onto it, box set down and belt fed in, the gunner
+  cocks and fires, then the whole thing is packed up and carried off.
+- **mg_fire.mp4**: gunner sweeping (the body turns with the gun), loader feeding the belt, steam off the
+  water jacket, belt runs out, belt change and cock, firing again.
+- **mg_swap.mp4**: a carrier runs a box up crouched and goes back, the gunner is hit and falls, the nearest
+  carrier crawls to the gun, takes the grips and keeps firing.
+
+New code: scripts/units/anim/clips_mg.gd (carries, loaded and crouched runs, crew poses, gunner death),
+tools/mg_clips.gd (the four scenes), plus a tripod that unfolds and a live belt in mg_builder.gd.
+All of it uses the same shared rig as the rifleman, so it bakes to Godot animations the same way.
+
+Still rough: crew places are fixed slots for the videos. The free-roaming crew (like a CoH squad, not
+a formation behind the gun) comes with the squad behaviour step.
