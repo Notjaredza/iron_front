@@ -91,3 +91,29 @@ officer, lineman and signaller looks in soldier_builder.gd (cap, greatcoat, bree
 Browne, pistol, armband, drum frame); clips_officer.gd and clips_signal.gd (the moves); tools/cmd_clips.gd.
 The rig got a "bone" item mode (the holstered pistol) and an opt-in way to place a hand-held item after
 the arm IK. The rifleman's and the gun team's clips are unchanged.
+
+# Troop lorry (started 22:34 2026-11-09 on "Go"; ETA about 3 to 4 h)
+
+An open army lorry with a canvas tilt (generic), one 12-man squad on benches. This round: driving (wheels turn,
+the body rides the bumps, exhaust), the squad climbing in and jumping out, close / mid / far looks, and the
+burning wreck left on the map. Built as the base vehicle for later ones. The engineers round is paused.
+
+**Done 22:52 2026-11-09** (about 20 min against the 3 to 4 h ETA). Videos in `results/units/anim/`:
+
+| Clip | What it shows |
+|---|---|
+| `lorry_look.mp4` | Close, mid and far looks side by side, plus the wreck; tailgate drops at 6 s |
+| `lorry_drive.mp4` | 12 men on the benches, 4.5 m/s over bumps: wheels turn, body rocks on soft springs, exhaust and dust |
+| `lorry_board.mp4` | The squad climbs in over the tailgate (step, knee, stand), stoops to a seat, tailgate up, drives off on a curve |
+| `lorry_dismount.mp4` | Pulls up, tailgate down, men jump out one by one, spread and kneel |
+| `lorry_wreck.mp4` | Shell hit, flash, swap to the burnt hull, flames and black smoke, then smouldering |
+
+Triangles (at 22:49, before the mid wheels were trimmed): close 6622, mid 3706 (now lower), far 360, wreck 4580.
+
+Files: `scripts/vehicles/lorry_builder.gd` (mesh: body, tilt, wheels, tailgate, wreck palette),
+`scripts/vehicles/lorry.gd` (`Lorry` node: wheel stations, steer, spring ride, tailgate, 12 seats),
+`scripts/units/anim/clips_vehicle.gd` (seated, driver, climb stages, stooped, crouch, airborne),
+`tools/lorry_clips.gd` (the five scenes).
+
+Base for other vehicles: copy the `Lorry` shape (body pivot, wheel stations, moving parts, seats).
+Not done yet: not tied to real move orders in the game, no reversing, the driver never gets out, no crew in the wreck scene.
