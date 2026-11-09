@@ -134,7 +134,8 @@ func searchlight(at: Vector3, nm := "Search") -> Node3D:
 	tilt.add_child(s)
 	# the visible beam: a long faint cone
 	var bg := TrainGeo.new()
-	bg.cyl(Vector3(0, 0, -0.4), Vector3(0, 0, -70.0), 0.42, 10, Color(1.0, 0.95, 0.8, 0.10), 8.0, 0)
+	bg.cyl(Vector3(0, 0, -0.4), Vector3(0, 0, -30.0), 0.42, 10, Color(1.0, 0.95, 0.8, 0.07), 3.6, 0)
+	bg.cyl(Vector3(0, 0, -30.0), Vector3(0, 0, -60.0), 3.6, 10, Color(1.0, 0.95, 0.8, 0.03), 6.8, 0)
 	if _beam_mat == null:
 		_beam_mat = StandardMaterial3D.new()
 		_beam_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED

@@ -94,6 +94,7 @@ static func _h(i: int, salt: int) -> float:
 ## Replays the ops into g. mode: full, glow, half, damaged, ruin, far, chunk (with chunk index 0..3).
 func replay(g: TrainGeo, mode: String, chunk := -1, seed_value := 0) -> void:
 	var cut := top_y() * 0.55
+	var ruin_max := top_y() * 0.6
 	for i in ops.size():
 		var o: Dictionary = ops[i]
 		var tr := int(o["tier"])
@@ -135,7 +136,7 @@ func replay(g: TrainGeo, mode: String, chunk := -1, seed_value := 0) -> void:
 					col = col.darkened(0.3 + r * 0.3)
 					if tg == "glow":
 						col = Color(0.06, 0.05, 0.05)
-					_clip(g, o, bot + (t - bot) * keep, col)
+					_clip(g, o, minf(bot + (t - bot) * keep, ruin_max), col)
 					continue
 			"far":
 				if tr >= 3 or tg == "detail":
@@ -205,6 +206,8 @@ static func _emit(g: TrainGeo, o: Dictionary, col: Color, far: bool) -> void:
 		"quad":
 			var p: Array = o["p"]
 			g.quad_out(p[0], p[1], p[2], p[3], col, o["ref"])
+		"prism":
+			g.prism(o["rings"], col)
 
 
 ## The walls' footprint: [centre x, centre z, half x, half z] of the tier-1 boxes taller than 1.6 m.

@@ -153,7 +153,7 @@ func _shot(nm: String) -> void:
 			print("BLD TRIS %s near=%d far=%d" % [k, fb.tri_count(), fb.far_tris()])
 			x += float(sz.x) * 8.0 + 6.0
 		look(Vector3(0, w * 0.55, w * 0.75), Vector3(0, 0, 2), 50)
-	elif nm.ends_with("_day") or nm.ends_with("_night"):
+	elif (nm.ends_with("_day") or nm.ends_with("_night")) and Buildings.KINDS.has(nm.substr(0, nm.rfind("_"))):
 		var k := nm.substr(0, nm.rfind("_"))
 		var b := add(k)
 		var sz := float(maxi(b.tiles.x, b.tiles.y)) * 8.0
@@ -163,7 +163,7 @@ func _shot(nm: String) -> void:
 		await process_frame
 		run([b], 2.5)
 		look(Vector3(-sz * 0.95, sz * 0.62, -sz * 1.05), Vector3(0, sz * 0.12, 0), 50)
-	elif nm.ends_with("_stages"):
+	elif nm.ends_with("_stages") and Buildings.KINDS.has(nm.substr(0, nm.rfind("_"))):
 		var k := nm.substr(0, nm.rfind("_"))
 		var sz: Vector2i = Buildings.KINDS[k][0]
 		var step := float(sz.x) * 8.0 + 8.0
