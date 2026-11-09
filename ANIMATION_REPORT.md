@@ -70,7 +70,7 @@ Models and moves in one go, one look at the end. Officer: peaked cap, greatcoat,
 whistle and wave on, map and binoculars, pistol fire and reload, point and hand signals. Signallers (a pair):
 wire drum, field phone, lamp and flags; lay wire, phone set up / crank / talk, repair a cut wire, lamp and flags.
 
-Done 22:25 2026-11-09. Pictures in results/units/cmd/, videos in results/units/anim/:
+Done 22:20 2026-11-09. Pictures in results/units/cmd/, videos in results/units/anim/:
 
 - **cmd_kit.mp4**: the officer, lineman and signaller turning, the kit laid out (phone, handset, lamp, flags, map,
   binoculars, whistle).
