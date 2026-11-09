@@ -2,7 +2,7 @@
 
 Asset Builder Chat, 2026-11-09, 22:16. Plan and answers: TRAINS_PLAN.md.
 
-**State: built and checked, ready for your look.** It took about 50 minutes, not the 8-9 h estimate.
+**State: APPROVED by the user 22:21 2026-11-09 ("Looks good").** It took about 50 minutes, not the 8-9 h estimate.
 
 ## What to look at (results/trains/)
 
