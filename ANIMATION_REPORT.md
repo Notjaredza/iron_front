@@ -179,3 +179,15 @@ binoculars and pointing lying down. The rest reuse the rifleman's set.
 Not done yet / rough: the LMG uses the rifle's bolt reload in `moves` (its own reload is the drum swap); the spotter's
 slung rifle sticks up when he lies down; the clubs never strike (no melee move yet); the mortar scene is crowded in
 the set-up shots; the throwers' carbine moves to the back quickly when they stand to throw.
+
+## Railway siege gun (Question Chat, started 00:21, done 00:45 2026-11-10)
+
+Our own railway howitzer, using the Schwerer Gustav idea at a smaller size: about 20 m long, so a normal engine can push it.
+- **Model** (`scripts/trains/siege_gun.gd`, class SiegeGun). A girder carriage on two 4-axle bogies with a heavy barrel (about 28 cm) in a cradle on a traversing mount. Rear loading platform with ladders, railings, a shell crane worked by a hand winch on the post, a loading tray, a breech block with a lever, and four outriggers. Close look is 6720 triangles, far look 96 (swaps at 320 m). The wreck build is darkened and has a torn barrel stub.
+- **Videos** (`results/units/anim/siege_*.mp4`, made with `tools/siege_clips.gd`):
+  - look: orbit with the outriggers going down, elevation to 43 degrees, the crane swing, the breech opening, the far look, then the wreck.
+  - move: one engine pushes the gun round a 110 m curve with the bogies following it, then stops and the outriggers go down.
+  - setup: the officer glasses the target, four men push the outriggers down, the crew climb the ladders, the layer traverses and elevates.
+  - fire: shell trolley, hook, hoist, swing to the tray, rammed by three men, charge from the rear box, breech shut, lanyard man jumps down, elevation, crew duck, officer's arm drop, FIRE (flash, fire and smoke along the bore, a ring of ground dust, a pressure ring, camera shake, recoil and the carriage rocking), then a second round from 150 m.
+  - wreck: a direct hit, the front of the barrel thrown off and tumbling, debris, crew knocked down, a burning, smoking hulk.
+- **Not done:** the third round (two are shown). The flash is a plain glow ball. The tracks are drawn on bare sand.
