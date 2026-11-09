@@ -2,7 +2,7 @@ extends RefCounted
 ## Iron Front buildings: the extra stills (walls, gates, defences, the base overview) for bld_pictures.gd.
 
 const SHOTS: Array[String] = ["walls_pieces", "walls_base_day", "walls_base_night", "walls_rail_gate", "walls_cliff",
-	"walls_stages", "defences_line", "defences_crews", "defences_belt_night", "base_overview_day", "base_overview_night"]
+	"walls_stages", "defences_line", "defences_crews", "defences_belt_night", "base_overview_day", "base_overview_night", "build_site"]
 
 var m: Object
 
@@ -89,6 +89,18 @@ func shot(main: Object, nm: String) -> void:
 			(list[6] as Building).set_damage(2)
 			m.run(list, 2.0)
 			m.look(Vector3(0, 20, -52), Vector3(0, 2, 0), 55)
+		"build_site":
+			var list: Array = []
+			for k in 2:
+				var b := Buildings.make(["barracks", "station"][k])
+				m.stage.add_child(b)
+				b.position = Vector3(-11.0 + float(k) * 26.0, 0, 0)
+				list.append(b)
+			await m.process_frame
+			(list[0] as Building).set_stage(1)
+			(list[1] as Building).set_stage(2)
+			m.run(list, 1.0)
+			m.look(Vector3(-12, 13, -32), Vector3(4, 1, -2), 50)
 		"defences_line":
 			var list := _front(Vector3.ZERO, false)
 			m.run(list, 1.0)

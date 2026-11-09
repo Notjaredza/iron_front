@@ -203,6 +203,10 @@ func _refresh() -> void:
 			2:
 				_look("half").visible = true
 				_look("scaffold").visible = true
+	if stage in [1, 2] and workers == null:
+		_make_workers()
+	if workers:
+		workers.visible = stage in [1, 2]
 	elif damage == 1:
 		_look("damaged").visible = true
 	elif damage == 2:
@@ -403,6 +407,61 @@ func add_man(at: Vector3, yaw: float, spec: Dictionary, seed_value := 1, hands: 
 	if is_inside_tree():
 		_pose_man(_men[-1])
 	return s
+
+
+## The builders shown while the building goes up (stages 1 and 2): one kneels hammering at the wall foot,
+## one carries a plank along the front, one stands at the stack of timber. Riflemen stand in for the
+## engineers (the engineer round is paused); made the first time a building is shown under construction.
+var workers: Node3D
+
+
+func _make_workers() -> void:
+	workers = Node3D.new()
+	workers.name = "Workers"
+	add_child(workers)
+	var r := g.core_rect()
+	var front := r[1] - r[3] - 0.7
+	var hammer_at := Vector3(r[0] - r[2] * 0.4, 0, front)
+	var nail := Vector3(r[0] - r[2] * 0.4, 0.55, r[1] - r[3] - 0.05)
+	var hm := _add_worker(hammer_at, PI, _CM.kneel_reach(), 301, func() -> Dictionary:
+		var p := to_global(nail + Vector3(0, 0.12 * absf(sin(t * 7.0)), 0))
+		return {"hand_r": p, "hand_l": to_global(nail + Vector3(-0.25, -0.05, 0))})
+	life.append({"type": "call", "fn": func(_tt: float, _dt: float) -> void:
+		if workers.visible and is_inside_tree():
+			_pose_man(hm)})
+	# the plank carrier and the plank
+	var c_at := Vector3(r[0] + r[2] * 0.3, 0, front - 1.4)
+	var pg := TrainGeo.new()
+	pg.box(Vector3.ZERO, Vector3(0.12, 0.04, 1.6), BldParts.TIMBER_NEW)
+	var plank := Node3D.new()
+	plank.position = c_at + Vector3(0.0, 1.05, -0.45)
+	plank.rotation.y = 1.2
+	workers.add_child(plank)
+	pg.make(plank, "Mesh", BldParts.material())
+	_add_worker(c_at, PI * 0.5 + 1.2, _CM.standing("free"), 302, func() -> Dictionary:
+		return {"hand_r": plank.to_global(Vector3(0.1, 0, -0.35)), "hand_l": plank.to_global(Vector3(-0.1, 0, 0.35))})
+	# a stack of timber with a man at it
+	var st := Vector3(r[0] + r[2] + 2.2, 0, r[1] - r[3] + 1.0)
+	var sg := TrainGeo.new()
+	for k in 4:
+		sg.box(st + Vector3(0, 0.1 + float(k) * 0.16, 0), Vector3(0.7, 0.08, 1.8), BldParts.TIMBER_NEW.darkened(0.06 * float(k)))
+	sg.make(workers, "Stack", BldParts.material())
+	_add_worker(st + Vector3(-1.1, 0, -0.4), -PI * 0.5, _CM.standing("free"), 303)
+
+
+func _add_worker(at: Vector3, yaw: float, spec: Dictionary, seed_value: int, hands: Variant = {}) -> Dictionary:
+	var s := Soldier.new().setup(seed_value, 0, "loader")
+	s.position = at
+	s.rotation.y = yaw
+	workers.add_child(s)
+	var m := {"s": s, "spec": spec, "hands": hands}
+	_men.append(m)
+	if is_inside_tree():
+		_pose_man(m)
+	return m
+
+
+const _CM := preload("res://scripts/units/anim/clips_mg.gd")
 
 
 func _ready() -> void:
