@@ -37,6 +37,7 @@ var belt_node: MeshInstance3D
 var flash: MeshInstance3D
 var puffs: Array = []
 var now := 0.0
+var prefix := "mg_"  # frame folder and video name prefix (subclasses change it)
 var frame := 0
 var gun_node: MeshInstance3D
 var tri_cache := {}
@@ -376,7 +377,7 @@ func _record(sc: String) -> void:
 	_reset()
 	var length: float = call("_scene_" + sc)
 	var phases: Array = _phases
-	var dir := ProjectSettings.globalize_path(FRAMES + "mg_" + sc + "/")
+	var dir := ProjectSettings.globalize_path(FRAMES + prefix + sc + "/")
 	DirAccess.make_dir_recursive_absolute(dir)
 	for f in DirAccess.get_files_at(dir):
 		DirAccess.remove_absolute(dir + f)
@@ -400,7 +401,7 @@ func _record(sc: String) -> void:
 		var img := root.get_texture().get_image()
 		img.convert(Image.FORMAT_RGB8)
 		img.save_jpg(dir + "f%04d.jpg" % f, 0.92)
-	print("frames mg_", sc, " ", n)
+	print("frames ", prefix, sc, " ", n)
 
 
 var _phases: Array = []

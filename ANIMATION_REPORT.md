@@ -63,3 +63,31 @@ All of it uses the same shared rig as the rifleman, so it bakes to Godot animati
 
 Still rough: crew places are fixed slots for the videos. The free-roaming crew (like a CoH squad, not
 a formation behind the gun) comes with the squad behaviour step.
+
+# Officer and signallers (started 22:00 2026-11-09 on "Go"; ETA about 3.5 to 4.5 h)
+
+Models and moves in one go, one look at the end. Officer: peaked cap, greatcoat, Sam Browne, pistol;
+whistle and wave on, map and binoculars, pistol fire and reload, point and hand signals. Signallers (a pair):
+wire drum, field phone, lamp and flags; lay wire, phone set up / crank / talk, repair a cut wire, lamp and flags.
+
+Done 22:25 2026-11-09. Pictures in results/units/cmd/, videos in results/units/anim/:
+
+- **cmd_kit.mp4**: the officer, lineman and signaller turning, the kit laid out (phone, handset, lamp, flags, map,
+  binoculars, whistle).
+- **cmd_orders.mp4**: whistle to the lips, wave on (four riflemen get up and go), pointing out the objective
+  while calling, hand signals halt / down / follow me, then he walks off with his own upright walk.
+- **cmd_field.mp4**: map out of the case, read, a look up at the ground, put away; binoculars out, glassing
+  left and right, put away; pistol drawn, three shots with flash and kick, magazine dropped and a new one in,
+  holstered.
+- **cmd_lay.mp4**: the lineman walks with the drum turning on his back and the wire left on the ground behind
+  him; the signaller sets the phone down, opens the lid, the lineman clips the line on, handset up, cranking,
+  talking.
+- **cmd_repair.mp4**: a line cut by a shell; the lineman walks the wire, picks up both ends, splices them,
+  lays them down; the signaller on the line rings through and talks.
+- **cmd_lamp.mp4**: Morse on the signal lamp (it lights the ground), then a run of semaphore positions.
+
+New code: kit_builder.gd (phone, crank, handset, drum, wire, lamp, flag, map, binoculars, whistle, magazine);
+officer, lineman and signaller looks in soldier_builder.gd (cap, greatcoat, breeches and tall boots, Sam
+Browne, pistol, armband, drum frame); clips_officer.gd and clips_signal.gd (the moves); tools/cmd_clips.gd.
+The rig got a "bone" item mode (the holstered pistol) and an opt-in way to place a hand-held item after
+the arm IK. The rifleman's and the gun team's clips are unchanged.

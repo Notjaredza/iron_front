@@ -7,7 +7,7 @@ extends RefCounted
 ##   root_rot  Euler degrees for the whole body (prone, falls), root_pos its shift
 ##   foot_r / foot_l    ankle targets in model space (two-bone leg IK), fpitch_r / fpitch_l
 ##                      foot pitch in degrees (+ = toe down), pole_kr / pole_kl knee poles
-##   rifle     where the held item goes: {mode: aim | chest | order | hand, ...}
+##   rifle     where the held item goes: {mode: aim | chest | order | hand | back | bone, ...}
 ##   hand_r / hand_l    null = arm by angles, Vector3 = a point in the item's frame,
 ##                      [bone, Vector3] = a point given in rest model space that rides
 ##                      on that bone (bone -1 = model space). pole_r / pole_l elbow poles.
@@ -103,6 +103,14 @@ static func solve(a: Dictionary, b: Dictionary, t: float) -> Array[Transform3D]:
 		var wb: Vector3 = target_of(hb, g) if hb != null else fk_hand
 		var pole: Vector3 = (a.get(arm[4], arm[5]) as Vector3).lerp(b.get(arm[4], arm[5]), t)
 		ik(g, arm[0], arm[1], arm[2], wa.lerp(wb, t), pole, B.PALM)
+	# An item held in a hand that IK placed (a pistol) is set after the arms
+	# ("after_ik": true; the rifle's own "hand" uses keep the old order).
+	var ra2: Dictionary = a.get("rifle", {})
+	var rb2: Dictionary = b.get("rifle", {})
+	if ra2.get("after_ik", false) or rb2.get("after_ik", false):
+		var ya := item_xf(ra2, g) if ra2.get("after_ik", false) else xa
+		var yb := item_xf(rb2, g) if rb2.get("after_ik", false) else xb
+		g[B.RIFLE] = ya.interpolate_with(yb, t)
 	return g
 
 
@@ -141,6 +149,11 @@ static func item_xf(r: Dictionary, g: Array[Transform3D]) -> Transform3D:
 			# Slung across the back, muzzle up behind the left shoulder.
 			var bas := Basis.looking_at(Vector3(-0.5, 0.85, 0.06).normalized(), Vector3(0, 0, 1))
 			return g[B.CHEST] * Transform3D(bas, Vector3(0.08, -0.2, 0.24) - bas * B.GRIP_R)
+		"bone":
+			# Riding on a bone (a holster): GRIP_R at "at" (rest model space), turned by "rot".
+			var bn: int = r.get("bone", B.HIPS)
+			var bas := Basis.from_euler((r.get("rot", Vector3.ZERO) as Vector3) * DEG)
+			return g[bn] * Transform3D(bas, (r["at"] as Vector3) - B.REST[bn] - bas * B.GRIP_R)
 		"hand":
 			# Held by the right hand: GRIP_R in the palm, turned by "rot" in the hand's frame.
 			var bas := Basis.from_euler((r.get("rot", Vector3.ZERO) as Vector3) * DEG)
