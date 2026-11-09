@@ -9,6 +9,7 @@ var hud: Label
 var seed := 1
 var map_w := 1000
 var map_h := 1500
+var ready_map := false                 # tools wait for this
 
 
 func _ready() -> void:
@@ -31,7 +32,11 @@ func _ready() -> void:
 	hud.add_theme_color_override("font_outline_color", Color.BLACK)
 	hud.add_theme_constant_override("outline_size", 4)
 	layer.add_child(hud)
+	hud.text = "Building the map (seed %d)..." % seed
+	await get_tree().process_frame
+	await get_tree().process_frame
 	new_map(seed)
+	ready_map = true
 
 
 func new_map(s: int) -> void:
@@ -53,10 +58,15 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if k.keycode == KEY_T:
 		view.set_look((view.look + 1) % 3)
 	elif k.keycode == KEY_N:
+		hud.text = "Building the map (seed %d)..." % (seed + 1)
+		await get_tree().process_frame
+		await get_tree().process_frame
 		new_map(seed + 1)
 
 
 func _process(_delta: float) -> void:
+	if not ready_map:
+		return
 	view.follow(cam.height)
 	hud.text = "Iron Front map test   seed %d   %s   %d FPS   height %d m\nWASD move, wheel zoom, Q/E turn, T day/night/fog, N new map" % [
 		seed, view.look_name(), Engine.get_frames_per_second(), int(cam.height)]

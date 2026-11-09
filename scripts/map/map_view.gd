@@ -17,6 +17,7 @@ var tris := 0
 var build_ms := 0
 var _results: Array = []
 var _mutex := Mutex.new()
+var _fog := 0.0                       # the look's fog density close to the ground
 
 
 func _ready() -> void:
@@ -116,7 +117,7 @@ func set_look(l: Look) -> void:
 			env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
 			env.ambient_light_energy = 1.0
 			env.fog_light_color = Color(0.74, 0.82, 0.90)
-			env.fog_density = 0.00008
+			_fog = 0.00008
 			env.fog_sky_affect = 0.3
 			env.tonemap_exposure = 1.05
 			mat.set_shader_parameter("mood", 0.0)
@@ -124,17 +125,17 @@ func set_look(l: Look) -> void:
 		Look.NIGHT:
 			sun.rotation_degrees = Vector3(-60, -40, 0)
 			sun.light_color = Color(0.56, 0.66, 0.92)
-			sun.light_energy = 0.32
+			sun.light_energy = 0.5
 			sky.sky_top_color = Color(0.02, 0.03, 0.07)
 			sky.sky_horizon_color = Color(0.07, 0.09, 0.14)
 			sky.ground_horizon_color = Color(0.06, 0.07, 0.10)
 			sky.ground_bottom_color = Color(0.02, 0.02, 0.03)
 			sky.sky_energy_multiplier = 1.0
 			env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-			env.ambient_light_color = Color(0.17, 0.22, 0.34)
-			env.ambient_light_energy = 0.7
+			env.ambient_light_color = Color(0.22, 0.26, 0.36)
+			env.ambient_light_energy = 0.9
 			env.fog_light_color = Color(0.07, 0.09, 0.13)
-			env.fog_density = 0.00045
+			_fog = 0.00045
 			env.fog_sky_affect = 1.0
 			env.tonemap_exposure = 1.0
 			mat.set_shader_parameter("mood", 1.0)
@@ -152,7 +153,7 @@ func set_look(l: Look) -> void:
 			env.ambient_light_color = Color(0.58, 0.62, 0.68)
 			env.ambient_light_energy = 0.8
 			env.fog_light_color = Color(0.60, 0.64, 0.68)
-			env.fog_density = 0.0024
+			_fog = 0.0024
 			env.fog_sky_affect = 1.0
 			env.tonemap_exposure = 1.0
 			mat.set_shader_parameter("mood", 0.35)
@@ -167,3 +168,6 @@ func look_name() -> String:
 func follow(height: float) -> void:
 	sun.shadow_enabled = height < 1500.0
 	sun.directional_shadow_max_distance = clampf(height * 1.8, 150.0, 900.0)
+	# Thinner fog from high up, so the whole map stays clear; the fog look keeps more of it.
+	var keep := 0.35 if look == Look.FOG else 0.06
+	env.fog_density = _fog * clampf(900.0 / maxf(height, 1.0), keep, 1.0)

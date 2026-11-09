@@ -13,10 +13,10 @@ extends RefCounted
 ## The vertex colour's alpha tags the material for the shader: 1 is plain, 0.5 is water, 0.25 is a lit window.
 
 const CHUNK := 64
-const BANK := 2.6
-const LIP := 0.35
-const LIP_DROP := 0.9
-const APRON := 3.2
+const BANK := 4.6
+const LIP := 0.5
+const LIP_DROP := 1.0
+const APRON := 3.6
 const SKIRT_Y := -14.0
 const PIECE := 2.4                 # rail piece length (m)
 const WATER_A := 0.5
@@ -29,7 +29,9 @@ const C_DIRT_HI := Color(0.57, 0.41, 0.25)
 const C_DIRT_LO := Color(0.49, 0.34, 0.20)
 const C_APRON := Color(0.60, 0.47, 0.30)
 const C_SAND := Color(0.68, 0.60, 0.42)
-const C_TRACK := Color(0.64, 0.51, 0.34)
+const C_TRACK := Color(0.56, 0.43, 0.28)
+const C_RAMP_SIDE := Color(0.52, 0.37, 0.22)
+const RAMP_SPREAD := 4.0          # the ramp sides slope out this far (m) at the foot of the cliff
 const C_SKIRT := Color(0.40, 0.30, 0.20)
 const C_BALLAST := Color(0.50, 0.47, 0.43)
 const C_BALLAST_OLD := Color(0.42, 0.45, 0.33)
@@ -310,12 +312,12 @@ func _edge_cell(x: int, z: int) -> void:
 ## The wall profile at one corner point: [offset out, height] pairs, top to bottom.
 func _profile(t: int, key: int) -> Array:
 	if t == 1:
-		return [[0.0, 0.0], [0.2, -0.35], [0.6, -1.5], [1.2, MapData.LEVEL_Y[0]]]
+		return [[0.0, 0.0], [0.6, -0.45], [1.7, -1.5], [2.8, MapData.LEVEL_Y[0]]]
 	var h1: float = MapData.level_y(t)
 	var h0: float = MapData.level_y(t - 1)
 	var j1 := _h01(key) - 0.5
 	var j2 := _h01(key * 31 + 7) - 0.5
-	return [[0.0, h1], [LIP, h1 - LIP_DROP], [BANK * 0.5 + j1 * 1.0, h0 + (h1 - h0) * 0.42 + j2 * 1.4], [BANK, h0]]
+	return [[0.0, h1], [LIP, h1 - LIP_DROP], [BANK * 0.48 + j1 * 1.6, h0 + (h1 - h0) * 0.45 + j2 * 1.6], [BANK, h0]]
 
 
 func _wall(s: Array, t: int) -> void:
@@ -334,7 +336,7 @@ func _wall(s: Array, t: int) -> void:
 		aq.append(Vector3(q.x + nq.x * float(pq[i][0]), float(pq[i][1]), q.y + nq.y * float(pq[i][0])))
 	var n2: Vector2 = s[2]
 	var out := Vector3(n2.x, 0.4, n2.y)
-	var cols := [C_SAND, C_DIRT_HI, C_DIRT_LO] if t == 1 else [C_LIP, C_DIRT_HI, C_DIRT_LO]
+	var cols := [C_LIP, C_DIRT_HI, C_SAND] if t == 1 else [C_LIP, C_DIRT_HI, C_DIRT_LO]
 	for i in 3:
 		quad(ap[i], ap[i + 1], aq[i + 1], aq[i], cols[i], out)
 	if t >= 2:
@@ -374,14 +376,24 @@ func _ramps() -> void:
 		var h0 := MapData.level_y(t - 1)
 		var f := e + 4.0 * s
 		var pts := {}
-		for k in [["t0", e, a, h1], ["t1", e, a + wd, h1], ["f0", f, a, h0], ["f1", f, a + wd, h0], ["b0", e, a, h0], ["b1", e, a + wd, h0]]:
+		var sp := RAMP_SPREAD / c
+		for k in [["t0", e, a, h1], ["t1", e, a + wd, h1], ["f0", f, a, h0], ["f1", f, a + wd, h0], ["b0", e, a - sp, h0], ["b1", e, a + wd + sp, h0]]:
 			var al: float = k[1]
 			var ac: float = k[2]
 			pts[k[0]] = Vector3(al * c, k[3], ac * c) if int(r["axis"]) == 0 else Vector3(ac * c, k[3], al * c)
-		quad(pts["t0"], pts["t1"], pts["f1"], pts["f0"], C_TRACK, Vector3.UP)
+		# The top: a dirt track down the middle with grass edges (all track on a narrow pass).
+		var edge := 0.0 if wd == 1 else 0.28
+		var grass: Color = C_LEVEL[t - 1].darkened(0.06)
+		var lanes := [[0.0, edge, grass], [edge, 1.0 - edge, C_TRACK], [1.0 - edge, 1.0, grass]]
+		for ln in lanes:
+			var u0: float = ln[0]
+			var u1: float = ln[1]
+			if u1 - u0 < 0.001:
+				continue
+			quad(pts["t0"].lerp(pts["t1"], u0), pts["t0"].lerp(pts["t1"], u1), pts["f0"].lerp(pts["f1"], u1), pts["f0"].lerp(pts["f1"], u0), ln[2], Vector3.UP)
 		var side := Vector3(0, 0, 1) if int(r["axis"]) == 0 else Vector3(1, 0, 0)
-		tri(pts["t0"], pts["f0"], pts["b0"], C_DIRT_HI, -side)
-		tri(pts["t1"], pts["f1"], pts["b1"], C_DIRT_HI, side)
+		tri(pts["t0"], pts["f0"], pts["b0"], C_RAMP_SIDE, -side + Vector3.UP * 0.5)
+		tri(pts["t1"], pts["f1"], pts["b1"], C_RAMP_SIDE, side + Vector3.UP * 0.5)
 
 
 # ------------------------------------------------------------------------------------------------------ map edge
@@ -556,7 +568,7 @@ func _houses() -> void:
 					_house(p, hd["size"], hd["rot"], Color(0.62, 0.36, 0.27), ROOFS[2], k)
 				"platform":
 					var sz: Vector2 = hd["size"]
-					box(p, Vector3(sz.x, 0.9, sz.y), hd["rot"], Color(0.52, 0.50, 0.47), Color(0.66, 0.64, 0.60))
+					box(p, Vector3(sz.x, 0.9, sz.y), hd["rot"], Color(0.48, 0.46, 0.43), Color(0.58, 0.56, 0.52))
 				"ruin":
 					_ruin(p, hd["size"], hd["rot"], k)
 

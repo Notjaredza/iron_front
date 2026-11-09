@@ -23,6 +23,7 @@ var comp := PackedInt32Array()
 var comp_size := PackedInt32Array()
 var comp_level := PackedByteArray()
 var rail_mask := PackedByteArray()
+var lowered := Rect2i()            # blocks lowered or filled by the last _ramps()
 
 
 static func generate(seed: int, w := 1000, h := 1500) -> MapData:
@@ -45,9 +46,10 @@ func _run(seed: int, w: int, h: int) -> MapData:
 	var stages := "shape+water %d" % (Time.get_ticks_msec() - tt)
 	tt = Time.get_ticks_msec()
 	var joined := false
+	var region := Rect2i(-1, -1, 0, 0)
 	for attempt in 8:
 		tt = Time.get_ticks_msec()
-		_fine_field()
+		_fine_field(region)
 		stages += ", field %d" % (Time.get_ticks_msec() - tt)
 		tt = Time.get_ticks_msec()
 		var ok_r := _ramps()
@@ -55,6 +57,7 @@ func _run(seed: int, w: int, h: int) -> MapData:
 		if ok_r:
 			joined = true
 			break
+		region = lowered
 	if not joined:
 		d.notes.append("ramps: areas still unjoined after 8 tries")
 	tt = Time.get_ticks_msec()
@@ -400,13 +403,19 @@ func _cham(bx: int, by: int, k: int, t: int) -> int:
 	return 1 if hv < 35 else (2 if hv < 78 else 3)
 
 
-func _fine_field() -> void:
+func _fine_field(r0 := Rect2i(-1, -1, 0, 0)) -> void:
 	var W1 := d.w + 1
 	var cw := d.cw
 	var chh := d.ch
 	var coarse := d.coarse
+	# The whole field, or just the blocks in r0 (grown by one) after areas were lowered or filled.
+	var whole := r0.position.x < 0
 	var field := PackedByteArray()
-	field.resize(W1 * (d.h + 1))
+	if whole:
+		field.resize(W1 * (d.h + 1))
+	else:
+		field = d.field
+	var rb := Rect2i(0, 0, cw, chh) if whole else r0.grow(1).intersection(Rect2i(0, 0, cw, chh))
 	var corners := [Vector2i(-1, -1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(1, 1)]
 	# The 4 x 4 points each corner cut of size c covers (index k * 4 + c).
 	var masks: Array[PackedByteArray] = []
@@ -423,8 +432,8 @@ func _fine_field() -> void:
 			masks.append(m)
 	var pts := PackedByteArray()
 	pts.resize(16)
-	for by in chh:
-		for bx in cw:
+	for by in range(rb.position.y, rb.end.y):
+		for bx in range(rb.position.x, rb.end.x):
 			var v := coarse[by * cw + bx]
 			var x0 := bx * MapData.BLOCK
 			var y0 := by * MapData.BLOCK
@@ -478,14 +487,21 @@ func _fine_field() -> void:
 	for x in W1:
 		field[d.h * W1 + x] = field[(d.h - 1) * W1 + x]
 	var walk := PackedByteArray()
-	walk.resize(d.w * d.h)
-	for y in d.h:
-		var r0 := y * W1
-		var r1 := r0 + W1
+	if whole:
+		walk.resize(d.w * d.h)
+	else:
+		walk = d.walk
+	var zy0 := maxi(0, rb.position.y * MapData.BLOCK - 1)
+	var zy1 := mini(d.h, rb.end.y * MapData.BLOCK + 1)
+	var xx0 := maxi(0, rb.position.x * MapData.BLOCK - 1)
+	var xx1 := mini(d.w, rb.end.x * MapData.BLOCK + 1)
+	for y in range(zy0, zy1):
+		var q0 := y * W1
+		var q1 := q0 + W1
 		var wr := y * d.w
-		for x in d.w:
-			var a := field[r0 + x]
-			if a == field[r0 + x + 1] and a == field[r1 + x] and a == field[r1 + x + 1]:
+		for x in range(xx0, xx1):
+			var a := field[q0 + x]
+			if a == field[q0 + x + 1] and a == field[q1 + x] and a == field[q1 + x + 1]:
 				walk[wr + x] = a
 			else:
 				walk[wr + x] = MapData.FLAT_NONE
@@ -552,6 +568,7 @@ func _ramps() -> bool:
 				reached = _reach(main, link)
 				changed = true
 	var cut := 0
+	lowered = Rect2i()
 	for c in comp_size.size():
 		if reached[c] == 0:
 			cut += 1
@@ -691,6 +708,7 @@ func _flatten(c: int) -> void:
 		for i in n:
 			if comp[i] == c:
 				d.coarse[i] = 2
+				_mark(i)
 		return
 	var seen := PackedByteArray()
 	seen.resize(n)
@@ -704,6 +722,7 @@ func _flatten(c: int) -> void:
 		var j := q[head]
 		head += 1
 		d.coarse[j] -= 1
+		_mark(j)
 		var x := j % d.cw
 		var y := j / d.cw
 		for dv: Vector2i in DIRS4:
@@ -715,6 +734,11 @@ func _flatten(c: int) -> void:
 			if seen[k] == 0 and lv[k] > t:
 				seen[k] = 1
 				q.append(k)
+
+
+func _mark(i: int) -> void:
+	var p := Vector2i(i % d.cw, i / d.cw)
+	lowered = Rect2i(p, Vector2i.ONE) if lowered.size == Vector2i.ZERO else lowered.merge(Rect2i(p, Vector2i.ONE))
 
 
 func _shuffle(a: Array) -> void:
@@ -741,7 +765,7 @@ func _rail_cost() -> PackedFloat32Array:
 				var v := _cv(x + dx, y + dy, 1)
 				if v >= 2:
 					ok = false
-		cost[i] = (6.0 if d.coarse[i] == 0 else 1.0) if ok else -1.0
+		cost[i] = (40.0 if d.coarse[i] == 0 else 1.0) if ok else -1.0     # bridges only where a line must cross
 	return cost
 
 
