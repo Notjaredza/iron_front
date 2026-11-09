@@ -2,7 +2,7 @@
 
 Asset Builder Chat, 2026-11-09, 23:45. Plan and answers: AIR_PLAN.md.
 
-**State: built, waiting for the user's look.** It took about 1 hour, not the 10-12 h estimate.
+**State: APPROVED by the user 23:48 2026-11-09 ("Looks good").** It took about 1 hour, not the 10-12 h estimate.
 
 ## What to look at (results/air/)
 
