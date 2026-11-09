@@ -72,3 +72,5 @@ Asset Builder Chat, 2026-11-10. Plan: PARA_PLAN.md. This round covers the models
 - The static line is not drawn yet; the chute just opens 0.9 s after the exit. A line from the anchor to the pack could be added if you want it.
 - The men vanish once inside the cabin, which has no interior. They show in the doorway when they jump.
 - The flak bursts are smoke puffs from the air effects. The later shells round can replace them.
+
+**Approved by the user 00:35 2026-11-10 ("Looks good").**
