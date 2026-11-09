@@ -1,5 +1,7 @@
 # Red jackets, round 1 (Building Chat 1, 2026-11-10)
 
+**APPROVED by the user 2026-11-10 00:37.**
+
 The first enemy type: musket-era line infantry, "a few red jackets", in the troops' faceted low-poly look.
 They are plain living soldiers. The test field comes in a later round; this round is pictures and clips.
 
