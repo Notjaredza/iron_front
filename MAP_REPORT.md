@@ -79,7 +79,7 @@ This was a fly-over at WW1's pan speed (tools/fly_run.gd, seed 2). Each map has 
 
 ## Round 2: ground detail (2026-11-09, 21:30)
 
-Your answers: all four kinds, light, ground only (cliff banks unchanged). **State: built and checked, ready for your look.**
+Your answers: all four kinds, light, ground only (cliff banks unchanged). **State: APPROVED by the user 21:29 2026-11-09 ("Looks good").**
 
 - **Painted ground (shader):**
   - large soft patches of lighter and darker grass;
