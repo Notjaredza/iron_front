@@ -145,3 +145,37 @@ The lorry got two options for this: `tilt` and `benches` (both on by default), a
 Not done yet: no limber or ammunition trailer; in the portee scene the other two crew are not shown and the ramps
 stay on the ground; the swing in `unhitch` is long (about 7 s); feet slide a little when men shift with the trail
 in `aim` and `push`.
+
+# Four troop types (started 23:42 2026-11-09 on "Go"; ETA 1.5 to 2.5 h)
+
+**Done 00:15 2026-11-10** (about 35 min). Four new kinds of troops on the rifleman's body and moves, all our own
+generic designs. Videos in `results/units/anim/`:
+
+| Clip | What it shows |
+|---|---|
+| `troop_look.mp4` | All ten roles close (front, then round the back), mid and far, with triangle counts |
+| `troop_moves.mp4` | Carbine, scoped rifle, LMG and the bomb carrier doing the rifleman's set: walk, kneel, fire (the LMG fires a burst), reload, prone, fire, up, hit and fall |
+| `troop_assault.mp4` | Section of 8 rushes in crouched, drops; three carbines fire, two throw stick grenades (they burst), the clubs wait; the NCO waves them on and they all rush |
+| `troop_snipers.mp4` | Pair crawl in under hooded capes, down behind a rise; the spotter takes the binoculars from the case, glasses and points; two shots with the bolt worked (dust kicks up), reload |
+| `troop_lmg.mp4` | Gunner and carrier run in, down; bipod swung down; three bursts (shake, flash, smoke); the carrier lifts off the empty drum, takes a full one from his pouch and fits it; firing again |
+| `troop_mortar.mp4` | Three men walk in with the tube on a shoulder and the plate on a back; plate set down, tube into the socket, bipod legs out; three bombs: from the bag, over the muzzle, let go, everyone ducks, the tube kicks, flash, smoke, dust |
+
+The roles (look keys in `SoldierBuilder.look_for_role`):
+- Assault: `assault_nco` (pistol, stripes), `assault` (carbine), `raider` (nail-studded trench club); grenade bags, no packs.
+- Snipers: `sniper` (scoped rifle), `spotter` (rifle, binocular case); both in a mottled hooded cape (hood replaces the helmet).
+- LMG: `lmg_gunner` (light machine gun with finned jacket; the drum and bipod are props so they can be swapped and swung), `lmg_carrier` (drum pouches).
+- Mortar: `mortar_tube` (pistol), `mortar_plate` (rifle, straps), `mortar_bombs` (rifle, front and back bomb bags).
+
+Triangles, close / mid / far: 894 to 1350 / 282 to 538 / 200 to 266 a man.
+
+Files: `scripts/units/troop_kit.gd` (`TroopKit`: weapons, body kit, hood, drum, bipod legs, baseplate, tube with
+opening bipod, bomb, stick grenade), `scripts/units/anim/clips_troops.gd` (club carries, grenade throw, prone
+binoculars and pointing, mortar crew kneel and duck), `tools/troop_clips.gd` (the six scenes).
+`soldier_builder.gd` got a `weapon` look key (rifle, carbine, scoped, lmg, club) and the new roles.
+
+New moves: grenade throw, LMG bipod deploy, burst and drum swap, mortar set-up and bomb drop, the spotter's
+binoculars and pointing lying down. The rest reuse the rifleman's set.
+
+Not done yet / rough: the LMG uses the rifle's bolt reload in `moves` (its own reload is the drum swap); the spotter's
+slung rifle sticks up when he lies down; the clubs never strike (no melee move yet); the mortar scene is crowded in
+the set-up shots; the throwers' carbine moves to the back quickly when they stand to throw.

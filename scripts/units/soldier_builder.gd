@@ -106,6 +106,32 @@ static func look_for_role(seed_value: int, role: String) -> Dictionary:
 		"signaller":
 			lk.merge({"rifle": true, "pack": false, "roll": 0, "shovel": false, "brassard": true,
 				"phone_strap": true}, true)
+		# Assault section (raiders): no packs, grenade bags; carbines, two with trench clubs,
+		# the NCO with a pistol.
+		"assault_nco":
+			lk.merge({"rifle": false, "pistol": true, "pack": false, "roll": 0, "shovel": false, "holster": true,
+				"stripes": true, "grenade_bags": true}, true)
+		"assault":
+			lk.merge({"weapon": "carbine", "pack": false, "roll": 0, "shovel": false, "grenade_bags": true}, true)
+		"raider":
+			lk.merge({"weapon": "club", "pack": false, "roll": 0, "shovel": false, "grenade_bags": true, "holster": true}, true)
+		# Sniper pair: hooded camouflage capes; the marksman's rifle has a scope, the spotter has binoculars.
+		"sniper":
+			lk.merge({"weapon": "scoped", "pack": false, "roll": 0, "shovel": false, "cape": true, "canteen": 0}, true)
+		"spotter":
+			lk.merge({"weapon": "rifle", "pack": false, "roll": 0, "shovel": false, "cape": true, "binocular_case": true}, true)
+		# Light machine gun team: the gunner (the gun's drum and bipod are props), the carrier with drum pouches.
+		"lmg_gunner":
+			lk.merge({"weapon": "lmg", "pack": false, "roll": 0, "shovel": false, "holster": true}, true)
+		"lmg_carrier":
+			lk.merge({"weapon": "rifle", "pack": true, "roll": 1, "drum_pouches": true}, true)
+		# Light mortar team: the tube man (pistol), the baseplate man and the bomb carrier (rifles).
+		"mortar_tube":
+			lk.merge({"rifle": false, "pack": false, "roll": 0, "shovel": false, "holster": true, "gloves": true}, true)
+		"mortar_plate":
+			lk.merge({"weapon": "rifle", "pack": false, "roll": 0, "shovel": false, "plate_straps": true}, true)
+		"mortar_bombs":
+			lk.merge({"weapon": "rifle", "pack": false, "roll": 0, "shovel": false, "bomb_bags": true}, true)
 	return lk
 
 
@@ -278,6 +304,8 @@ static func build(look: Dictionary, lod: int) -> UnitGeo:
 
 	if look.get("cap", false):
 		_build_cap(g, d0)
+	elif look.get("cape", false):
+		TroopKit.hood(g, d0)
 	else:
 		_build_helmet(g, look, d0, thin, X, Z)
 
@@ -304,12 +332,22 @@ static func build(look: Dictionary, lod: int) -> UnitGeo:
 			g.loft([Vector3(-0.212, y + 0.02, 0.0), Vector3(-0.213, y - 0.02, 0.0)],
 				[Vector2(0.071, 0.077) * wl, Vector2(0.07, 0.076) * wl], X, ls, 0.0, [CLOTH_WHITE, SIGNAL_BLUE][k], UARM_L, null, 0)
 	_build_role_kit(g, look, d0, w)
+	TroopKit.body_kit(g, look, d0, w)
 
 	if look.get("pistol", false):
 		_build_pistol(g, lod)
 	elif look.get("rifle", true):
-		_build_rifle(g, lod)
+		_build_weapon(g, look, lod)
 	return g
+
+
+## The held weapon by look["weapon"]: rifle (default), carbine, scoped, lmg, club.
+static func _build_weapon(g: UnitGeo, look: Dictionary, lod: int) -> void:
+	match look.get("weapon", "rifle"):
+		"rifle":
+			_build_rifle(g, lod)
+		_:
+			TroopKit.weapon(g, look.get("weapon", "rifle"), lod)
 
 
 ## The officer's peaked cap: band, flat crown, a visor and a brass badge.
@@ -435,6 +473,8 @@ static func _build_far(g: UnitGeo, look: Dictionary) -> void:
 		g.loft([Vector3(0, 1.735, 0), Vector3(0, 1.80, 0), Vector3(0, 1.838, 0.006)],
 			[Vector2(0.105, 0.117), Vector2(0.13, 0.142), Vector2(0.126, 0.138)], X, 4, 0.0, CAP, HEAD)
 		g.box(Vector3(0, 1.745, -0.135), Vector3(0.085, 0.005, 0.034), LEATHER, HEAD)
+	elif look.get("cape", false):
+		TroopKit.hood(g, false)
 	else:
 		g.loft([Vector3(0, 1.735, 0), Vector3(0, 1.75, 0), Vector3(0, 1.885, 0.006)],
 			[Vector2(0.168, 0.178), Vector2(0.13, 0.14), Vector2(0.06, 0.065)], X, 4, 0.0, HELMET, HEAD)
@@ -442,7 +482,13 @@ static func _build_far(g: UnitGeo, look: Dictionary) -> void:
 		for s: float in [1.0, -1.0]:
 			g.loft([Vector3(0.105 * s, 1.0, 0), Vector3(0.13 * s, 0.45, 0.01)], [Vector2(0.105, 0.125), Vector2(0.108, 0.13)],
 				X, 4, 0.0, COAT, bone_side(s, THIGH_R, THIGH_L))
+	if look.get("cape", false):
+		g.loft([Vector3(0, 1.52, 0.0), Vector3(0, 1.05, 0.02)], [Vector2(0.17, 0.13), Vector2(0.27, 0.17)], X, 4, 0.0,
+			TroopKit.CAPE_A, CHEST)
 	if look.get("pistol", false):
 		_build_pistol(g, 2)
 	elif look.get("rifle", true):
-		_build_rifle(g, 2)
+		if look.get("weapon", "rifle") in ["rifle", "carbine", "scoped"]:
+			_build_rifle(g, 2)
+		else:
+			TroopKit.weapon(g, look.get("weapon", "rifle"), 2)
