@@ -17,6 +17,11 @@ const KINDS := {
 	"telegraph": [Vector2i(1, 1), "comms"],
 	"lamp_tower": [Vector2i(1, 1), "comms"],
 	"pigeon_loft": [Vector2i(1, 1), "comms"],
+	"lab_comms": [Vector2i(2, 2), "research"],
+	"lab_weapons": [Vector2i(2, 2), "research"],
+	"lab_rail": [Vector2i(3, 2), "research"],
+	"lab_defences": [Vector2i(2, 2), "research"],
+	"wreck_yard": [Vector2i(3, 3), "research"],
 }
 
 
@@ -52,6 +57,16 @@ static func make(kind: String) -> Building:
 			BldComms.lamp_tower(b)
 		"pigeon_loft":
 			BldComms.pigeon_loft(b)
+		"lab_comms":
+			BldResearch.lab_comms(b)
+		"lab_weapons":
+			BldResearch.lab_weapons(b)
+		"lab_rail":
+			BldResearch.lab_rail(b)
+		"lab_defences":
+			BldResearch.lab_defences(b)
+		"wreck_yard":
+			BldResearch.wreck_yard(b)
 	b.finish()
 	return b
 

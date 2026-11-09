@@ -138,6 +138,9 @@ func replay(g: TrainGeo, mode: String, chunk := -1, seed_value := 0) -> void:
 						col = Color(0.06, 0.05, 0.05)
 					_clip(g, o, minf(bot + (t - bot) * keep, ruin_max), col)
 					continue
+			"ground":
+				if tr != 0 or tg == "glow":
+					continue
 			"far":
 				if tr >= 3 or tg == "detail":
 					continue
@@ -148,6 +151,8 @@ func replay(g: TrainGeo, mode: String, chunk := -1, seed_value := 0) -> void:
 				if o["t"] == "lump":
 					continue
 			"chunk":
+				if tr == 0:
+					continue
 				if tg == "glow":
 					col = Color(0.08, 0.07, 0.06)
 				var c: Vector3 = o["c"]

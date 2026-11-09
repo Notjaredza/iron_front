@@ -271,6 +271,8 @@ func _look(nm: String) -> Node3D:
 			BldParts.rubble(tg, hs, kind.hash())
 		"far":
 			g.replay(tg, "far")
+		"ground":
+			g.replay(tg, "ground")
 	tg.make(n, "Mesh", BldParts.material())
 	return n
 
@@ -330,6 +332,7 @@ func collapse(u: float) -> void:
 	lamps.visible = false
 	var ruin := _look("ruin")
 	ruin.visible = u > 0.55
+	_look("ground").visible = u <= 0.55
 	for q in 4:
 		var c := _chunks[q]
 		c.visible = u < 0.98
