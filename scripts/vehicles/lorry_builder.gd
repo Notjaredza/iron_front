@@ -73,7 +73,7 @@ static func body(lod := 0, wreck := false, tilt := true, benches := true) -> Uni
 	var p := _palette(wreck)
 	var d0 := lod == 0
 	if lod >= 2:
-		_body_far(g, p, wreck)
+		_body_far(g, p, wreck, tilt)
 		return g
 	var X := Vector3.RIGHT
 	var Z := Vector3.BACK
@@ -247,12 +247,12 @@ static func _quad2(g: UnitGeo, a: Vector3, b: Vector3, c: Vector3, d: Vector3, c
 
 
 ## Far look: a handful of boxes (about 150 triangles).
-static func _body_far(g: UnitGeo, p: Dictionary, wreck: bool) -> void:
+static func _body_far(g: UnitGeo, p: Dictionary, wreck: bool, tilt := true) -> void:
 	g.box(Vector3(0, 0.7, -0.3), Vector3(0.45, 0.08, 3.0), p["chassis"], 0)
 	g.box(Vector3(0, 1.13, -2.68), Vector3(0.4, 0.43, 0.55), p["paint"], 0)
 	g.box(Vector3(0, 1.62, -1.7), Vector3(0.95, 0.66, 0.43), p["paint"], 0)
 	g.box(Vector3(0, FLOOR_Y + 0.12, 0.71), Vector3(BED_HALF, 0.17, 1.91), p["wood"], 0)
-	if not wreck:
+	if not wreck and tilt:
 		g.loft([Vector3(0, 2.2, BED_FRONT), Vector3(0, 2.2, BED_REAR)], [Vector2(1.1, 0.78), Vector2(1.1, 0.78)], Vector3.RIGHT,
 			6, 0.0, p["canvas"], 0)
 	for s: float in [1.0, -1.0]:

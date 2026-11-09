@@ -6,3 +6,17 @@
 - Kinds: heavy rhomboid (gun and MG versions) and light turret tank (gun and MG versions). Each has close, mid and far looks plus a wreck.
 - Videos: results/units/anim/tank_*.mp4 (10). Pictures: results/units/tanks/ (tank_gallery.png plus front and back of each look).
 - Not done: ditching, tying the tanks to real move orders, tanker helmets.
+
+## Rocket lorry round (Tanks Chat), answers taken 2026-11-10 ~00:30
+- State: "Go" ~00:24; BUILT 2026-11-10 00:46 (about 25 min). APPROVED by the user (00:52, after the lying-down fix) and committed. Details in ROCKET_REPORT.md. Videos: results/units/anim/rocket_*.mp4 (7). Pictures: results/units/rockets/. Check: ROCKET CHECK OK (salvo lands 198-258 m).
+- 00:49: the user says it is good except for the men lying down weirdly. Fix chosen: no one lies down. The men in cover in the fire clip crouch, and the running crew in the wreck clip kneel when they stop. On "Go", done 00:50: fire and wreck clips re-rendered.
+- A generic lorry-mounted rocket rack, built on the troop lorry: no tilt or benches, a blast shield behind the cab, an open lattice frame of about 12-16 steel launch rails on a turntable on the bed. Crew of 4 (an NCO and 3 men).
+- Moves: park, set up (level, raise and turn the rails) and pack up; load (rockets carried from a box and slid onto the rails); ripple salvo (fire trails, a smoke cloud, dust thrown up behind), rockets in flight on arcs landing about 150-250 m out in a spread of blasts, all in one shot; hit (rockets cooking off, burning wreck, crew running).
+- Close, mid and far looks plus the wreck, all in one go, one look at the end.
+- ETA once the user says go: about 1 to 2 h.
+
+## Red jackets round 1 (Building Chat 1), go 2026-11-10 ~00:05
+- The first enemy type: musket-era line infantry in the troops' faceted look. Musketeer, officer, drummer, ensign (flag).
+- Moves: march, volley (kneeling front rank, standing rear rank), the long reload (~18 s), bayonet charge and thrust, deaths and blast throws.
+- BUILT 2026-11-10 ~00:36 (fb7be6f), approved 00:37, well under the 5 h ETA; APPROVED by the user. Pictures and clips in results/units/redcoats/. Report: REDCOATS_REPORT.md.
+- Shells-in-flight round PAUSED by the user until the other chats' effect assets are in.
