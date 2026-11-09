@@ -61,6 +61,10 @@ const DRUM_C := Vector3(-0.17, 0.80, -0.25)
 const DRUM_AX := Vector3(0.34, 0.93, -0.12)
 const DRUM_R := 0.19
 const DRUM_H := 0.17
+## Gunner tools along the item frame's Z.
+const STAFF_RAM_Z := 1.15
+const STAFF_SPONGE_Z := -1.25
+const LINSTOCK_TIP_Z := -0.75
 
 
 static func look_for_role(seed_value: int, role: String) -> Dictionary:
@@ -83,6 +87,15 @@ static func look_for_role(seed_value: int, role: String) -> Dictionary:
 			lk.merge({"build": r.randf_range(0.93, 0.98), "pack": false, "canteen": false}, true)
 		"drummer":
 			lk.merge({"build": r.randf_range(0.92, 0.97), "pack": false}, true)
+		"grenadier":
+			lk.merge({"build": r.randf_range(1.06, 1.13)}, true)
+		"light":
+			lk.merge({"build": r.randf_range(0.93, 1.02), "pack": false, "facing": "green"}, true)
+		"dragoon":
+			lk.merge({"build": r.randf_range(0.97, 1.05), "pack": false, "canteen": false}, true)
+		_:
+			if role.begins_with("gunner"):
+				lk.merge({"pack": false, "facing": "blue"}, true)
 	return lk
 
 
@@ -150,14 +163,15 @@ static func build(look: Dictionary, lod: int) -> UnitGeo:
 		g.loft(_t([Vector3(x, 0.98, 0), Vector3(x, 0.74, -0.01), Vector3(x, 0.55, 0)], thin),
 			_t([Vector2(0.085, 0.092) * wl, Vector2(0.073, 0.079) * wl, Vector2(0.062, 0.066) * wl], thin),
 			X, ls, 0.0, WHITE, th, null, 0)
-		var leg_col := LEATHER_BLK if off else GAITER
+		var booted := off or role == "dragoon"
+		var leg_col := LEATHER_BLK if booted else GAITER
 		# Gaiter / boot top, flared over the knee.
 		g.loft([Vector3(x, 0.62, 0.0), Vector3(x, 0.53, -0.005)], [Vector2(0.07, 0.074) * wl, Vector2(0.066, 0.07) * wl],
 			X, ls, 0.0, leg_col, th if d0 else sh, null, 1)
 		g.loft(_t([Vector3(x, 0.54, 0), Vector3(x, 0.33, 0.01), Vector3(x, 0.10, 0)], thin),
 			_t([Vector2(0.063, 0.067) * wl, Vector2(0.057, 0.063) * wl, Vector2(0.052, 0.056)], thin),
 			X, ls, 0.0, leg_col, sh, null, 0)
-		if d0 and not off:
+		if d0 and not booted:
 			# The gaiter's buttons down the outside, and its strap under the knee.
 			for k in 4:
 				g.box(Vector3(x + 0.058 * s * wl, 0.46 - 0.095 * k, 0.0), Vector3(0.004, 0.006, 0.006), LEATHER_BLK.lightened(0.25), sh)
@@ -170,7 +184,7 @@ static func build(look: Dictionary, lod: int) -> UnitGeo:
 		if d0:
 			g.box(Vector3(x, 0.072, -0.1), Vector3(0.022, 0.012, 0.012), STEEL if off else BRASS, ft, Basis(Vector3.RIGHT, 0.5))
 		# Coat tails, behind and to the side of each thigh, so the legs stride free; the white turnback.
-		var tail_y := 0.50 if off else 0.60
+		var tail_y := 0.50 if off else (0.84 if role == "light" else 0.60)
 		g.loft(_t([Vector3(x * 1.05, 1.0, 0.035), Vector3(x * 1.12, 0.80, 0.06), Vector3(x * 1.18, tail_y, 0.085)], thin),
 			_t([Vector2(0.09, 0.062) * w, Vector2(0.092, 0.064) * w, Vector2(0.09, 0.06) * w], thin),
 			X, sides, 0.0, coat, th, null, 2)
@@ -221,7 +235,7 @@ static func build(look: Dictionary, lod: int) -> UnitGeo:
 					[Vector2(0.012, 0.012), Vector2(0.022, 0.022)], X, 4, 0.0, SASH, HIPS, null, 2)
 		g.box(Vector3(0, 1.445, -0.112 * w), Vector3(0.05, 0.026, 0.008), GOLD, CHEST, Basis(Vector3.RIGHT, -0.35), 0.4 if d0 else 0.0)
 	# ---- belts and kit.
-	if role == "musketeer":
+	if role in ["musketeer", "grenadier", "light"]:
 		_cross_belts(g, w, d0)
 	elif role == "ensign":
 		# The colour belt: right shoulder to left hip... the socket for the pole's butt at the right hip front.
@@ -232,7 +246,32 @@ static func build(look: Dictionary, lod: int) -> UnitGeo:
 		_strap(g, [Vector3(0.12 * w, 1.0, -0.15 * w), Vector3(0.0, 1.16, -0.156 * w), Vector3(-0.1 * w, 1.15, -0.14 * w)], 0.012, WHITE, SPINE)
 	elif role == "drummer":
 		_drum(g, w, d0, facing)
-	if role in ["officer", "ensign", "drummer"]:
+	elif role.begins_with("gunner") or role == "dragoon":
+		# A white waist belt over the coat; gunners have a small pouch and a priming horn, the dragoon a carbine belt.
+		g.loft([Vector3(0, 1.0, 0), Vector3(0, 1.05, 0)], [Vector2(0.186 * w, 0.126 * w), Vector2(0.186 * w, 0.126 * w)],
+			X, sides, ch, WHITE, HIPS, null, 0)
+		if role == "dragoon":
+			_strap(g, [Vector3(0.15 * w, 0.98, -0.11 * w), Vector3(0.0, 1.25, -0.152 * w), Vector3(-0.13, 1.51, -0.02),
+				Vector3(-0.03, 1.30, 0.138 * w), Vector3(0.15 * w, 1.0, 0.12 * w)], 0.034, WHITE, CHEST)
+			g.box(Vector3(0.16 * w, 0.98, -0.1 * w), Vector3(0.02, 0.03, 0.008), STEEL, HIPS)
+		else:
+			g.box(Vector3(0.12 * w, 0.97, 0.12 * w), Vector3(0.06, 0.045, 0.03), LEATHER_BLK, HIPS, Basis(Vector3.UP, -0.35))
+			if d0:
+				g.loft([Vector3(-0.16 * w, 1.0, -0.07), Vector3(-0.19 * w, 0.88, -0.05), Vector3(-0.17 * w, 0.82, -0.02)],
+					[Vector2(0.02, 0.02), Vector2(0.03, 0.03), Vector2(0.01, 0.01)], X, 6, 0.0, Color(0.82, 0.74, 0.55), HIPS)
+	if role == "grenadier":
+		# The grenade pouch on the left hip, the match case (a brass tube) on the right cross-belt, laced shoulder wings.
+		g.box(Vector3(-0.16 * w, 0.96, -0.06), Vector3(0.03, 0.07, 0.075), LEATHER_BLK, HIPS, Basis(), 0.2 if d0 else 0.0)
+		g.loft([Vector3(-0.07 * w, 1.40, -0.15 * w), Vector3(-0.05 * w, 1.33, -0.158 * w)], [Vector2(0.014, 0.014), Vector2(0.014, 0.014)],
+			X, 6 if d0 else 4, 0.0, BRASS, CHEST)
+		for s: float in [1.0, -1.0]:
+			g.loft([Vector3(0.2 * s, 1.49, 0.0), Vector3(0.215 * s, 1.43, 0.0)], [Vector2(0.084, 0.09) * wl, Vector2(0.086, 0.092) * wl],
+				X, ls, 0.0, coat, _side(s, SB.UARM_R, SB.UARM_L), WHITE if d0 else null, 0)
+	elif role == "light":
+		# A powder horn on its cord at the right hip.
+		g.loft([Vector3(0.17 * w, 1.0, -0.05), Vector3(0.2 * w, 0.9, -0.02), Vector3(0.17 * w, 0.84, 0.03)],
+			[Vector2(0.022, 0.022), Vector2(0.03, 0.03), Vector2(0.008, 0.008)], X, 6 if d0 else 4, 0.0, Color(0.82, 0.74, 0.55), HIPS)
+	if role in ["officer", "ensign", "drummer", "dragoon"]:
 		# A sword in its scabbard on the left hip, hung back (the drummer's is a short hanger).
 		var long := role != "drummer"
 		var tip := Vector3(-0.22 * w, 0.42 if long else 0.62, 0.28 if long else 0.18)
@@ -281,7 +320,15 @@ static func build(look: Dictionary, lod: int) -> UnitGeo:
 		# The queue, tied with a black ribbon.
 		g.loft([Vector3(0, 1.66, 0.11), Vector3(0, 1.53, 0.115)], [Vector2(0.018, 0.014), Vector2(0.013, 0.01)], X, 4, 0.0, hair, HEAD)
 		g.box(Vector3(0, 1.645, 0.112), Vector3(0.022, 0.012, 0.017), HAT, HEAD)
-	_tricorne(g, d0, lace, off)
+	match role:
+		"grenadier":
+			_mitre(g, d0, facing)
+		"light":
+			_light_cap(g, d0)
+		"dragoon":
+			_helmet(g, d0)
+		_:
+			_tricorne(g, d0, lace, off)
 
 	# ---- arms: red sleeves, cuffs in the facing colour (laced for the drummer), hands.
 	for s: float in [1.0, -1.0]:
@@ -311,9 +358,9 @@ static func build(look: Dictionary, lod: int) -> UnitGeo:
 
 	# ---- what each holds on the item bone.
 	match role:
-		"musketeer":
+		"musketeer", "grenadier", "light":
 			_musket(g, lod)
-		"officer":
+		"officer", "dragoon":
 			_sword(g, lod)
 		"drummer":
 			_stick_r(g)
@@ -322,6 +369,12 @@ static func build(look: Dictionary, lod: int) -> UnitGeo:
 				X, 4, 0.0, WALNUT.lightened(0.35), SB.HAND_L)
 		"ensign":
 			_pole(g, lod)
+		"gunner_sponge":
+			_staff(g, lod)
+		"gunner_fire":
+			_linstock(g, lod)
+		"gunner_aim":
+			_handspike(g)
 	return g
 
 
@@ -381,6 +434,107 @@ static func _tricorne(g: UnitGeo, d0: bool, lace: Color, off: bool) -> void:
 		g.box(side.lerp(c, 0.5) + Vector3(-0.02, 0.085, -0.035), Vector3(0.004, 0.008, 0.008), lace, HEAD, Basis(Vector3.UP, 0.55))
 
 
+
+## The grenadier's mitre cap: a tall red cloth cap tapering up, a tall front plate in the facing colour with a
+## white badge, a small red flap at its foot, a white tuft on top.
+static func _mitre(g: UnitGeo, d0: bool, facing: Color) -> void:
+	var X := Vector3.RIGHT
+	var hs := 8 if d0 else 5
+	g.loft([Vector3(0, 1.735, 0.01), Vector3(0, 1.84, 0.02), Vector3(0, 1.97, 0.03), Vector3(0, 2.04, 0.035)],
+		[Vector2(0.102, 0.112), Vector2(0.094, 0.1), Vector2(0.07, 0.07), Vector2(0.035, 0.035)], X, hs, 0.0, RED, HEAD)
+	g.loft([Vector3(0, 1.73, 0.01), Vector3(0, 1.765, 0.01)], [Vector2(0.106, 0.116), Vector2(0.106, 0.116)], X, hs, 0.0,
+		WHITE if d0 else facing, HEAD, null, 0)
+	# The front plate: a shield shape, flat, leaning back a little, both sides drawn.
+	var b0 := Vector3(-0.1, 1.74, -0.105)
+	var b1 := Vector3(0.1, 1.74, -0.105)
+	var m0 := Vector3(-0.085, 1.93, -0.07)
+	var m1 := Vector3(0.085, 1.93, -0.07)
+	var top := Vector3(0, 2.09, -0.025)
+	_quad2(g, b0, b1, m1, m0, facing, HEAD)
+	_two(g, m0, m1, top, facing, HEAD)
+	if d0:
+		# The badge (a white oval with a crown block), the red flap with its white edge, the tuft.
+		g.box(Vector3(0, 1.88, -0.087), Vector3(0.04, 0.05, 0.004), WHITE, HEAD, Basis(Vector3.RIGHT, -0.19))
+		g.box(Vector3(0, 1.955, -0.068), Vector3(0.025, 0.018, 0.004), GOLD, HEAD, Basis(Vector3.RIGHT, -0.19))
+		g.box(Vector3(0, 1.765, -0.112), Vector3(0.09, 0.022, 0.004), RED, HEAD, Basis(Vector3.RIGHT, -0.19))
+		g.box(Vector3(0, 1.79, -0.11), Vector3(0.09, 0.004, 0.005), WHITE, HEAD, Basis(Vector3.RIGHT, -0.19))
+		g.loft([Vector3(0, 2.035, 0.035), Vector3(0, 2.075, 0.04)], [Vector2(0.03, 0.03), Vector2(0.018, 0.018)], X, 6, 0.0, WHITE, HEAD)
+
+
+## The light infantry cap: a low round black leather crown, the front flap turned up, a green tuft on the left.
+static func _light_cap(g: UnitGeo, d0: bool) -> void:
+	var X := Vector3.RIGHT
+	var hs := 10 if d0 else 6
+	g.loft([Vector3(0, 1.735, 0.01), Vector3(0, 1.80, 0.012), Vector3(0, 1.85, 0.015)],
+		[Vector2(0.102, 0.112), Vector2(0.1, 0.11), Vector2(0.075, 0.085)], X, hs, 0.0, HAT, HEAD)
+	# The upturned front flap.
+	_quad2(g, Vector3(-0.1, 1.74, -0.1), Vector3(0.1, 1.74, -0.1), Vector3(0.08, 1.9, -0.085), Vector3(-0.08, 1.9, -0.085), HAT, HEAD)
+	if d0:
+		g.box(Vector3(0, 1.82, -0.096), Vector3(0.03, 0.03, 0.004), FACINGS["green"].lightened(0.1), HEAD, Basis(Vector3.RIGHT, 0.1))
+		g.loft([Vector3(-0.09, 1.82, -0.02), Vector3(-0.1, 1.94, -0.02)], [Vector2(0.018, 0.018), Vector2(0.026, 0.026)],
+			X, 6, 0.0, FACINGS["green"], HEAD)
+		g.loft([Vector3(0, 1.735, -0.02), Vector3(0, 1.75, -0.02)], [Vector2(0.104, 0.114), Vector2(0.104, 0.114)], X, hs, 0.0,
+			HAT.lightened(0.12), HEAD, null, 0)
+
+
+## The dragoon's helmet: a black leather skull, a brass comb front to back with a black horsehair crest falling
+## behind, a brass front plate, a short peak.
+static func _helmet(g: UnitGeo, d0: bool) -> void:
+	var X := Vector3.RIGHT
+	var hs := 10 if d0 else 6
+	g.loft([Vector3(0, 1.725, 0.01), Vector3(0, 1.80, 0.012), Vector3(0, 1.855, 0.015), Vector3(0, 1.875, 0.015)],
+		[Vector2(0.104, 0.114), Vector2(0.104, 0.112), Vector2(0.08, 0.088), Vector2(0.03, 0.04)], X, hs, 0.0, HAT, HEAD)
+	_quad2(g, Vector3(-0.09, 1.735, -0.1), Vector3(0.09, 1.735, -0.1), Vector3(0.08, 1.725, -0.16), Vector3(-0.08, 1.725, -0.16),
+		HAT, HEAD)
+	# The comb: a brass ridge over the top from the brow to the nape.
+	g.loft([Vector3(0, 1.82, -0.1), Vector3(0, 1.9, -0.03), Vector3(0, 1.905, 0.04), Vector3(0, 1.85, 0.11)],
+		[Vector2(0.012, 0.03), Vector2(0.012, 0.04), Vector2(0.012, 0.04), Vector2(0.012, 0.03)], X, 4, 0.0, BRASS, HEAD)
+	# The crest of horsehair, from the comb's top down the back.
+	g.loft([Vector3(0, 1.93, -0.01), Vector3(0, 1.92, 0.08), Vector3(0, 1.82, 0.16), Vector3(0, 1.66, 0.17)],
+		[Vector2(0.02, 0.03), Vector2(0.03, 0.04), Vector2(0.026, 0.035), Vector2(0.01, 0.015)], X, 4, 0.0, Color(0.06, 0.05, 0.05), HEAD)
+	if d0:
+		g.box(Vector3(0, 1.79, -0.106), Vector3(0.06, 0.04, 0.004), BRASS, HEAD, Basis(Vector3.RIGHT, -0.2))
+		g.box(Vector3(0, 1.79, -0.109), Vector3(0.022, 0.022, 0.004), RED, HEAD, Basis(Vector3.RIGHT, -0.2))
+
+
+## The gunner's staff: rammer head at one end (+Z, behind the hands), the sheepskin sponge at the other (-Z).
+## 2.4 m long; the hands hold it near the middle.
+static func _staff(g: UnitGeo, lod: int) -> void:
+	var o: Vector3 = SB.REST[ITEM]
+	var X := Vector3.RIGHT
+	var s := 6 if lod == 0 else 4
+	g.loft([o + Vector3(0, 0, STAFF_RAM_Z), o + Vector3(0, 0, STAFF_SPONGE_Z)], [Vector2(0.018, 0.018), Vector2(0.018, 0.018)],
+		X, 4, 0.0, WALNUT.lightened(0.15), ITEM)
+	g.loft([o + Vector3(0, 0, STAFF_RAM_Z - 0.03), o + Vector3(0, 0, STAFF_RAM_Z + 0.16)], [Vector2(0.05, 0.05), Vector2(0.05, 0.05)],
+		X, s, 0.0, WALNUT, ITEM)
+	g.loft([o + Vector3(0, 0, STAFF_SPONGE_Z + 0.02), o + Vector3(0, 0, STAFF_SPONGE_Z - 0.24)], [Vector2(0.055, 0.055), Vector2(0.05, 0.05)],
+		X, s, 0.0, Color(0.78, 0.74, 0.66) if lod == 0 else CANVAS, ITEM)
+
+
+## The linstock: a 1 m staff with a brass forked head holding the smouldering slow match.
+static func _linstock(g: UnitGeo, lod: int) -> void:
+	var o: Vector3 = SB.REST[ITEM]
+	var X := Vector3.RIGHT
+	g.loft([o + Vector3(0, 0, 0.3), o + Vector3(0, 0, LINSTOCK_TIP_Z + 0.08)], [Vector2(0.014, 0.014), Vector2(0.012, 0.012)],
+		X, 4, 0.0, WALNUT, ITEM)
+	if lod >= 2:
+		return
+	for s: float in [1.0, -1.0]:
+		g.loft([o + Vector3(0, 0, LINSTOCK_TIP_Z + 0.08), o + Vector3(0.035 * s, 0, LINSTOCK_TIP_Z)], [Vector2(0.006, 0.006),
+			Vector2(0.005, 0.005)], X, 4, 0.0, BRASS, ITEM)
+		g.loft([o + Vector3(0.035 * s, 0, LINSTOCK_TIP_Z), o + Vector3(0.04 * s, -0.05, LINSTOCK_TIP_Z - 0.01)],
+			[Vector2(0.007, 0.007), Vector2(0.006, 0.006)], X, 4, 0.0, Color(0.55, 0.48, 0.36), ITEM)
+	g.box(o + Vector3(0.04, -0.055, LINSTOCK_TIP_Z - 0.01), Vector3(0.009, 0.009, 0.009), Color(1.0, 0.45, 0.12), ITEM)
+
+
+## The handspike: a 1.5 m ash lever, squared, its foot shod with iron (+Z end goes under the trail).
+static func _handspike(g: UnitGeo) -> void:
+	var o: Vector3 = SB.REST[ITEM]
+	g.loft([o + Vector3(0, 0, 0.9), o + Vector3(0, 0, -0.6)], [Vector2(0.025, 0.032), Vector2(0.018, 0.02)], Vector3.RIGHT, 4, 0.0,
+		WALNUT.lightened(0.25), ITEM)
+	g.loft([o + Vector3(0, 0, 0.9), o + Vector3(0, 0, 0.78)], [Vector2(0.027, 0.034), Vector2(0.027, 0.034)], Vector3.RIGHT, 4, 0.0,
+		STEEL_DARK, ITEM, null, 1)
+
 ## The musket with its bayonet fixed: long walnut stock almost to the muzzle, brass butt plate, guard and pipes,
 ## the lock and cock on the right, a white sling. The rammer is its own prop (RedcoatBuilder.rammer), drawn in the reload.
 static func _musket(g: UnitGeo, lod: int) -> void:
@@ -436,6 +590,35 @@ static func cartridge() -> UnitGeo:
 		Color(0.92, 0.9, 0.84), 0)
 	return g
 
+
+
+## The grenade: an iron ball a little bigger than a fist's grip, a wooden fuse plug on top.
+static func grenade() -> UnitGeo:
+	var g := UnitGeo.new()
+	g.loft([Vector3(0, -0.05, 0), Vector3(0, -0.03, 0), Vector3(0, 0.03, 0), Vector3(0, 0.05, 0)],
+		[Vector2(0.02, 0.02), Vector2(0.046, 0.046), Vector2(0.046, 0.046), Vector2(0.02, 0.02)], Vector3.RIGHT, 8, 0.0,
+		Color(0.1, 0.1, 0.11), 0)
+	g.loft([Vector3(0, 0.045, 0), Vector3(0, 0.075, 0)], [Vector2(0.012, 0.012), Vector2(0.009, 0.009)], Vector3.RIGHT, 5, 0.0, WALNUT, 0)
+	return g
+
+
+## The burning fuse's spark, shown once it is lit.
+static func fuse_spark() -> UnitGeo:
+	var g := UnitGeo.new()
+	g.box(Vector3(0, 0.085, 0), Vector3(0.014, 0.014, 0.014), Color(1.0, 0.62, 0.2), 0, Basis(Vector3(1, 1, 0).normalized(), 0.7))
+	g.box(Vector3(0.01, 0.1, 0), Vector3(0.006, 0.006, 0.006), Color(1.0, 0.9, 0.5), 0)
+	return g
+
+
+## The gun's round, carried by the loader: the flannel powder bag with the ball strapped to its end (along X).
+static func round_shot() -> UnitGeo:
+	var g := UnitGeo.new()
+	g.loft([Vector3(-0.06, 0, 0), Vector3(0.1, 0, 0)], [Vector2(0.045, 0.045), Vector2(0.045, 0.045)], Vector3.UP, 8, 0.0,
+		Color(0.80, 0.72, 0.58), 0)
+	g.loft([Vector3(-0.13, 0, 0), Vector3(-0.1, 0, 0), Vector3(-0.06, 0, 0), Vector3(-0.03, 0, 0)],
+		[Vector2(0.015, 0.015), Vector2(0.044, 0.044), Vector2(0.044, 0.044), Vector2(0.015, 0.015)], Vector3.UP, 8, 0.0,
+		Color(0.14, 0.14, 0.15), 0)
+	return g
 
 ## The officer's sword: grip at GRIP_R, the blade along -Z.
 static func _sword(g: UnitGeo, lod: int) -> void:
@@ -529,7 +712,7 @@ static func _build_far(g: UnitGeo, look: Dictionary) -> void:
 			coat, _side(s, SB.FARM_R, SB.FARM_L))
 	g.loft([Vector3(0, 0.86, 0), Vector3(0, 1.08, 0)], [Vector2(0.175, 0.112), Vector2(0.18, 0.115)], X, 4, 0.0, WAISTCOAT, HIPS)
 	g.loft([Vector3(0, 1.06, 0), Vector3(0, 1.5, 0)], [Vector2(0.18, 0.118), Vector2(0.2, 0.12)], X, 4, 0.0, coat, CHEST)
-	if role == "musketeer":
+	if role in ["musketeer", "grenadier", "light"]:
 		g.box(Vector3(0, 1.27, -0.125), Vector3(0.11, 0.07, 0.006), WHITE, CHEST)
 	elif off:
 		g.loft([Vector3(0, 0.99, 0), Vector3(0, 1.07, 0)], [Vector2(0.186, 0.124), Vector2(0.186, 0.124)], X, 4, 0.0, SASH, HIPS)
@@ -537,12 +720,16 @@ static func _build_far(g: UnitGeo, look: Dictionary) -> void:
 	# The hat: one flat triangle and a block.
 	g.loft([Vector3(0, 1.74, 0.01), Vector3(0, 1.84, 0.015)], [Vector2(0.15, 0.15), Vector2(0.09, 0.09)], X, 3, 0.0, HAT, HEAD)
 	match role:
-		"musketeer":
+		"musketeer", "grenadier", "light":
 			_musket(g, 2)
-		"officer":
+		"officer", "dragoon":
 			_sword(g, 2)
 		"ensign":
 			_pole(g, 2)
+		"gunner_sponge":
+			_staff(g, 2)
+		"gunner_fire":
+			_linstock(g, 2)
 		"drummer":
 			var ax := DRUM_AX.normalized()
 			g.loft([DRUM_C - ax * DRUM_H, DRUM_C + ax * DRUM_H], [Vector2(DRUM_R, DRUM_R), Vector2(DRUM_R, DRUM_R)],

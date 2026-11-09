@@ -10,10 +10,13 @@ extends Soldier
 
 const RB := preload("res://scripts/units/redcoat_builder.gd")
 const M := preload("res://scripts/units/anim/clips_musket.gd")
+const M2 := preload("res://scripts/units/anim/clips_redcoat2.gd")
 
 var role := "musketeer"
 var rammer: MeshInstance3D
 var cartridge: MeshInstance3D
+var grenade: MeshInstance3D   # the grenadier's grenade, or the loader's round (powder bag and ball)
+var spark: MeshInstance3D
 var flag: MeshInstance3D
 var _att_item: BoneAttachment3D
 var _att_hand: BoneAttachment3D
@@ -62,6 +65,21 @@ func setup(seed_value: int, lod_level := 0, role_name := "") -> Soldier:
 		cartridge.transform = Transform3D(Basis(Vector3.RIGHT, 0.4), palm_local() + Vector3(0, -0.01, -0.03))
 		cartridge.visible = false
 		set_props({})
+	if (role == "grenadier" or role == "gunner_load") and lod <= 1:
+		_att_hand = BoneAttachment3D.new()
+		_att_hand.bone_name = B.BONE_NAMES[B.HAND_R]
+		skel.add_child(_att_hand)
+		if role == "grenadier":
+			grenade = _prop("grenade", RB.grenade)
+			grenade.transform = Transform3D(Basis(), palm_local() + Vector3(0, -0.02, -0.04))
+			spark = _prop("spark", RB.fuse_spark)
+			grenade.add_child(spark)
+			_att_hand.add_child(grenade)
+			grenade.visible = false
+		else:
+			grenade = _prop("round", RB.round_shot)
+			grenade.transform = Transform3D(Basis(), palm_local() + Vector3(-0.07, -0.02, -0.04))
+			_att_hand.add_child(grenade)
 	if role == "ensign":
 		flag = MeshInstance3D.new()
 		var key := "flag%d" % mini(lod, 1)
@@ -84,6 +102,7 @@ static func flag_material() -> ShaderMaterial:
 static func library() -> Dictionary:
 	if _lib.is_empty():
 		_lib = M.library()
+		_lib.merge(M2.library(), true)
 	return _lib
 
 
@@ -138,6 +157,11 @@ static func prop_state(clip: Dictionary, time: float) -> Dictionary:
 
 
 func set_props(state: Dictionary) -> void:
+	if grenade != null:
+		var gs: Array = state.get("grenade", ["off" if role == "grenadier" else "hand", 0.0])
+		grenade.visible = gs[0] == "hand" or gs[0] == "lit"
+		if spark != null:
+			spark.visible = gs[0] == "lit"
 	if rammer == null:
 		return
 	var rs: Array = state.get("rammer", ["stock", 0.0])
@@ -148,12 +172,25 @@ func set_props(state: Dictionary) -> void:
 
 ## The role's own name for a shared clip (deaths, get up), as BlastThrow plays them.
 func clip_name(base: String) -> String:
-	return M.role_clip(role, base)
+	return M2.role_clip(role, base)
+
+
+## The named poses for a role (round 2 roles have their own).
+static func poses_for(role_name: String) -> Dictionary:
+	return M2.poses(role_name)
 
 
 func set_pose(pose_name: String) -> void:
-	var ps := M.poses(role)
+	var ps := poses_for(role)
 	var p: Dictionary = ps.get(pose_name, ps["stand"])
+	show_spec(p)
+
+
+## Shows one pose spec, on the ground (ground=false: as given, for the rider in the saddle).
+func show_spec(p: Dictionary, ground := true) -> void:
 	var g := Rig.solve(p, p, 0.0)
-	Rig.lift(g, Rig.ground_lift(g, geo))
+	if ground:
+		Rig.lift(g, Rig.ground_lift(g, geo))
 	Anim.apply(skel, g)
+	if grenade != null and role == "gunner_load":
+		set_props({})

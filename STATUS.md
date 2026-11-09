@@ -20,3 +20,7 @@
 - Moves: march, volley (kneeling front rank, standing rear rank), the long reload (~18 s), bayonet charge and thrust, deaths and blast throws.
 - BUILT 2026-11-10 ~00:36 (fb7be6f), approved 00:37, well under the 5 h ETA; APPROVED by the user. Pictures and clips in results/units/redcoats/. Report: REDCOATS_REPORT.md.
 - Shells-in-flight round PAUSED by the user until the other chats' effect assets are in.
+
+## Red coats round 2 (Building Chat 1), go 2026-11-10 ~00:50, ETA about 2-4 h (by ~03:00-04:50)
+- Grenadiers (mitre caps, lit grenades), light infantry (skirmish: cover, kneel, fire, low runs, prone), a 6-pounder field gun and its five-man crew (the drill: sponge, load, ram, prime, lay, fire, recoil, run up), dragoons on a new horse model (walk, trot, gallop, charge, rear, fall; sabre carry, raise, cut, point).
+- Pictures and move sheets only (the user: "pics to save time"). BUILT 2026-11-10 ~01:11, inside the ETA; waits for the user's look. Report: REDCOATS_REPORT.md (round 2 section).

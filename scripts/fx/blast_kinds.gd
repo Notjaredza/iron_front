@@ -163,7 +163,7 @@ static func build(kind: String, at: Vector3, seed_value: int, density := 1.0, nr
 			_fire(b, at, 2, 0.22, 0.05, 0.0)
 			b.merge({"flash": 1.6, "light_range": 4.0, "fire_h": 0.0, "glow_r": 0.6, "fire_life": 0.05,
 				"total": 2.0, "reach": 6.0, "top": 6.0}, true)
-		"musket", "pan":
+		"musket", "pan", "cannon":
 			_musket(b, kind, at, nrm, density)
 		_:
 			if kind.begins_with("flare"):
@@ -330,20 +330,21 @@ static func _musket(b: Dictionary, kind: String, at: Vector3, nrm: Vector3, dens
 		b.merge({"flash": 1.2, "light_range": 3.0, "fire_h": 0.1, "glow_r": 0.3, "fire_life": 0.06, "total": 4.0,
 			"reach": 3.0, "top": 2.0}, true)
 		return
-	# The flame: a short hot tongue out of the muzzle.
-	for i in n.call(7):
-		var reach := rng.randf_range(0.25, 0.9)
-		var target := at + d * reach + S._ball() * 0.12
-		var s1 := rng.randf_range(0.09, 0.2) * (1.2 - reach * 0.5)
+	# The flame: a short hot tongue out of the muzzle (the cannon: about three times the reach and size).
+	var sc := 2.6 if kind == "cannon" else 1.0
+	for i in n.call(7.0 * sc):
+		var reach := rng.randf_range(0.25, 0.9) * sc
+		var target := at + d * reach + S._ball() * 0.12 * sc
+		var s1 := rng.randf_range(0.09, 0.2) * (1.2 - reach / sc * 0.5) * sc
 		S._add(b["fire"], at, (target - at) * 16.0, rng.randf_range(0.0, 0.01), rng.randf_range(0.05, 0.1), 16.0, 0.0,
-			s1 * 0.3, s1, Color(1, 1, 1, 1), rng.randf_range(-2, 2), 0.0, 1.0 - reach)
+			s1 * 0.3, s1, Color(1, 1, 1, 1), rng.randf_range(-2, 2), 0.0, 1.0 - reach / sc)
 	# The bank of smoke: thrown out along the barrel (the furthest blobs the biggest), then hanging and rising slowly.
-	for i in n.call(44):
+	for i in n.call(44.0 * sc):
 		var f := pow(rng.randf(), 0.7)
-		var target := at + d * (0.3 + 3.2 * f) + S._ball() * (0.15 + 0.45 * f) + Vector3(0, 0.15 * f, 0)
+		var target := at + (d * (0.3 + 3.2 * f) + S._ball() * (0.15 + 0.45 * f) + Vector3(0, 0.15 * f, 0)) * sc
 		var k := rng.randf_range(2.6, 3.6)
-		var s1 := rng.randf_range(0.14, 0.3) * (0.5 + 1.3 * f)
+		var s1 := rng.randf_range(0.14, 0.3) * (0.5 + 1.3 * f) * sqrt(sc)
 		S._add(b["smoke"], at + d * 0.05, (target - at) * k, rng.randf_range(0.0, 0.06), rng.randf_range(7.0, 12.0), k, 0.05,
 			s1 * 0.25, s1, smoke_col.call(), rng.randf_range(-0.4, 0.4), 0.8, 1.0)
-	b.merge({"flash": 3.0, "light_range": 7.0, "fire_h": 0.2, "glow_r": 0.8, "fire_life": 0.08, "total": 13.0,
+	b.merge({"flash": 3.0 * sc, "light_range": 7.0 * sc, "fire_h": 0.2, "glow_r": 0.8, "fire_life": 0.08, "total": 13.0,
 		"reach": 8.0, "top": 4.0, "crater_r": 0.0}, true)
