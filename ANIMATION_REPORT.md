@@ -117,3 +117,31 @@ Files: `scripts/vehicles/lorry_builder.gd` (mesh: body, tilt, wheels, tailgate, 
 
 Base for other vehicles: copy the `Lorry` shape (body pivot, wheel stations, moving parts, seats).
 Not done yet: not tied to real move orders in the game, no reversing, the driver never gets out, no crew in the wreck scene.
+
+# Light field gun (started 22:59 2026-11-09 on "Go"; ETA 1.5 to 2.5 h)
+
+**Done 23:33 2026-11-09** (about 35 min). A generic WW1-era field gun of about 75 mm, our own design: two big
+spoked wheels, box trail with spade, steel shield, barrel on a recoil cradle, axle seats. Crew of six: NCO,
+layer, breech man, loader, two ammunition numbers. Videos in `results/units/anim/`:
+
+| Clip | What it shows |
+|---|---|
+| `gun_look.mp4` | Close, mid, far and the wreck; elevating, recoil, breech open |
+| `gun_fire.mp4` | Three rounds: out of the box, handed to the loader, rammed, breech closed, NCO's arm drops, fire (flash, smoke, dust, recoil, hop), everyone flinches, breech opens, case thrown out |
+| `gun_aim.mp4` | NCO points the new line, the layer winds the handwheel (barrel elevates), handspike in the trail, three heaves swing the gun left |
+| `gun_push.mp4` | Manhandling: trail lifted, two on the trail, one behind each wheel, one with the ammunition box, pushed 3.6 m and swung round 28 degrees, trail down |
+| `gun_unhitch.mp4` | Lorry arrives towing, crew jump out, trail off the hook, lorry away, the gun swung round 180 degrees and the crew take post |
+| `gun_hitch.mp4` | Lorry backs up, trail lifted onto the hook, crew climb in either side of the trail, away towing |
+| `gun_portee.mp4` | Lorry with tilt and benches off, ramps down, two men haul on ropes from the bed while two push the trail, gun aboard with the trail over the tailboard, away |
+| `gun_wreck.mp4` | Direct hit: flash, dirt, the gun knocked out (a wheel off, shield torn, charred), burning, smoke |
+
+Triangles: close 3250, mid 1578, far 144, wreck about 3100.
+
+Files: `scripts/vehicles/field_gun_builder.gd` (mesh pieces, rounds, ammunition box, ramps, handspike),
+`scripts/vehicles/field_gun.gd` (`FieldGun` node: carriage lift, elevation, recoil, breech, handwheel, wheel roll),
+`scripts/units/anim/clips_gun.gd` (crew poses), `tools/gun_clips.gd` (the eight scenes; a `close` check view too).
+The lorry got two options for this: `tilt` and `benches` (both on by default), and a tow hook point `HOOK`.
+
+Not done yet: no limber or ammunition trailer; in the portee scene the other two crew are not shown and the ramps
+stay on the ground; the swing in `unhitch` is long (about 7 s); feet slide a little when men shift with the trail
+in `aim` and `push`.

@@ -33,14 +33,14 @@ static func seats() -> Array:
 	return SEATS
 
 
-func setup(lod_level := 0, burnt := false) -> Lorry:
+func setup(lod_level := 0, burnt := false, tilt := true, benches := true) -> Lorry:
 	lod = lod_level
 	wreck = burnt
 	body = Node3D.new()
 	body.name = "Body"
 	add_child(body)
 	var bm := MeshInstance3D.new()
-	bm.mesh = MG.mesh(L.body(lod, wreck))
+	bm.mesh = MG.mesh(L.body(lod, wreck, tilt, benches))
 	body.add_child(bm)
 	tailgate = Node3D.new()
 	tailgate.position = L.TAILGATE_HINGE

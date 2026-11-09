@@ -24,6 +24,7 @@ const BENCH_X := 0.8
 const BENCH_TOP := 1.65
 const TAILGATE_HINGE := Vector3(0, 1.12, 2.64)
 const STEP := Vector3(0, 0.62, 2.78)  # the step iron under the tailgate (top)
+const HOOK := Vector3(0, 0.6, 2.84)  # tow hook (a towed gun's eye sits here)
 const EXHAUST := Vector3(-0.62, 0.52, 2.5)
 const DRIVER := Vector3(0.45, 1.0, -1.42)  # the driver's seat (on the cab floor)
 const WHEEL_HUB := Vector3(0.45, 1.72, -1.88)  # the steering wheel centre
@@ -66,7 +67,8 @@ static func _w(c: Color, wreck: bool, at: Vector3) -> Color:
 	return c
 
 
-static func body(lod := 0, wreck := false) -> UnitGeo:
+## tilt = canvas and hoops on; benches = the two side benches (off for a cargo or gun-carrying lorry).
+static func body(lod := 0, wreck := false, tilt := true, benches := true) -> UnitGeo:
 	var g := UnitGeo.new()
 	var p := _palette(wreck)
 	var d0 := lod == 0
@@ -172,12 +174,8 @@ static func body(lod := 0, wreck := false) -> UnitGeo:
 		g.box(Vector3(REAR_X * s, 0.99, REAR_Z), Vector3(0.24, 0.015, 0.55), p["paint_dark"], 0)
 	g.box(Vector3(0, FLOOR_Y + 0.3, BED_FRONT + 0.02), Vector3(BED_HALF, 0.3, 0.03), _w(p["wood"], wreck, Vector3(0, 1.5, -1.2)), 0)
 	# Benches down each side.
-	for s: float in [1.0, -1.0]:
-		g.box(Vector3(BENCH_X * s, BENCH_TOP - 0.025, bz + 0.05), Vector3(0.17, 0.025, bh - 0.15), p["wood_raw"], 0)
-		if d0:
-			for z in [BED_FRONT + 0.4, bz, BED_REAR - 0.35]:
-				g.box(Vector3(BENCH_X * s, (BENCH_TOP + FLOOR_Y) * 0.5, z), Vector3(0.14, (BENCH_TOP - FLOOR_Y) * 0.5, 0.02),
-					p["wood_raw"], 0)
+	if benches:
+		_benches(g, p, d0, bz, bh)
 	# Step iron under the tailgate, a tow hook, a jerrican and a tool box on the right board.
 	g.box(STEP + Vector3(0, -0.01, 0), Vector3(0.22, 0.012, 0.07), p["chassis"], 0)
 	g.loft([Vector3(0, FLOOR_Y - 0.1, BED_REAR - 0.05), STEP + Vector3(0, 0, -0.02)], [Vector2(0.015, 0.015), Vector2(0.015, 0.015)],
@@ -186,7 +184,8 @@ static func body(lod := 0, wreck := false) -> UnitGeo:
 		g.box(Vector3(0, 0.62, 2.78), Vector3(0.04, 0.04, 0.06), p["chassis"], 0)
 		g.box(Vector3(0.92, 0.82, -0.85), Vector3(0.07, 0.15, 0.11), p["paint_dark"], 0, Basis(), 0.2)
 		g.box(Vector3(0.92, 0.76, -0.45), Vector3(0.09, 0.09, 0.2), p["chassis"], 0)
-	_tilt(g, p, lod, wreck)
+	if tilt:
+		_tilt(g, p, lod, wreck)
 	return g
 
 
@@ -308,3 +307,12 @@ static func tailgate(lod := 0, wreck := false) -> UnitGeo:
 ## Triangle counts for the report.
 static func tri_counts(lod: int) -> int:
 	return body(lod).tri_count() + 2 * wheel(lod).tri_count() + 2 * wheel(lod, true).tri_count() + tailgate(lod).tri_count()
+
+
+static func _benches(g: UnitGeo, p: Dictionary, d0: bool, bz: float, bh: float) -> void:
+	for s: float in [1.0, -1.0]:
+		g.box(Vector3(BENCH_X * s, BENCH_TOP - 0.025, bz + 0.05), Vector3(0.17, 0.025, bh - 0.15), p["wood_raw"], 0)
+		if d0:
+			for z in [BED_FRONT + 0.4, bz, BED_REAR - 0.35]:
+				g.box(Vector3(BENCH_X * s, (BENCH_TOP + FLOOR_Y) * 0.5, z), Vector3(0.14, (BENCH_TOP - FLOOR_Y) * 0.5, 0.02),
+					p["wood_raw"], 0)
