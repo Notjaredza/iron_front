@@ -10,7 +10,7 @@ The user asked "lets give them seige equipment". The answers given:
 - **Targets:** not chosen. Our walls, gate and trenches are used.
 - **Output:** pictures only ("skip videos to save time").
 
-Go was given at 19:02 with an ETA of 1-1.5 h. It was built by 19:30 (about 30 min).
+Go was given at 19:02 with an ETA of 1-1.5 h. It was built by 19:30 (about 30 min). APPROVED by the user at 19:30.
 
 ## What is built
 Every engine faces -Z and is built from parts. Each moving part hangs on its own pivot, so it moves on a state. The crews take their hand spots from the engine's moving handles, spokes, ropes and rails, so the hands stay on them.

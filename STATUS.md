@@ -47,4 +47,4 @@
 
 ## Medieval siege equipment (Building Chat 1), go 2026-11-10 19:02, ETA about 1-1.5 h
 - Trebuchet, mangonel, ballista, siege tower, roofed ram, scaling ladders, mantlets, fascines; full crew work. Pictures only.
-- BUILT 19:30 (about 30 min): SiegeEngine / siege_builder.gd / clips_siege.gd, tools/siege_pictures.gd, SIEGE_REPORT.md. Pictures: results/units/medieval/siege_*.png. Waits for the user's look.
+- BUILT 19:30 (about 30 min): SiegeEngine / siege_builder.gd / clips_siege.gd, tools/siege_pictures.gd, SIEGE_REPORT.md. Pictures: results/units/medieval/siege_*.png. APPROVED by the user 19:30.
