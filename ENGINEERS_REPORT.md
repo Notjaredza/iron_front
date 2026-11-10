@@ -6,7 +6,7 @@ The user asked "can we do the workers and crew now?". These were the answers giv
 - **Jobs:** dig a trench, build, barbed wire, strip a wreck, track repair.
 - **Output:** pictures only. The work grows as they work.
 
-Go was given at 17:04, with an ETA of 1.5-2.5 h. Pictures were done by 17:24.
+Go was given at 17:04, with an ETA of 1.5-2.5 h. Pictures were done by 17:24. APPROVED by the user at 17:31.
 
 ## What is built
 - **The men** are on the rifleman's skeleton, so every pose, clip, IK hand, death and blast throw works.
