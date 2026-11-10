@@ -304,6 +304,8 @@ static func build(look: Dictionary, lod: int) -> UnitGeo:
 
 	if look.get("cap", false):
 		_build_cap(g, d0)
+	elif look.get("bare", false):
+		pass  # bareheaded (the zombies add their own scalp)
 	elif look.get("cape", false):
 		TroopKit.hood(g, d0)
 	else:
@@ -473,6 +475,8 @@ static func _build_far(g: UnitGeo, look: Dictionary) -> void:
 		g.loft([Vector3(0, 1.735, 0), Vector3(0, 1.80, 0), Vector3(0, 1.838, 0.006)],
 			[Vector2(0.105, 0.117), Vector2(0.13, 0.142), Vector2(0.126, 0.138)], X, 4, 0.0, CAP, HEAD)
 		g.box(Vector3(0, 1.745, -0.135), Vector3(0.085, 0.005, 0.034), LEATHER, HEAD)
+	elif look.get("bare", false):
+		pass
 	elif look.get("cape", false):
 		TroopKit.hood(g, false)
 	else:

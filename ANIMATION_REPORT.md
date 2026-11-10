@@ -191,3 +191,30 @@ Our own railway howitzer, using the Schwerer Gustav idea at a smaller size: abou
   - fire: shell trolley, hook, hoist, swing to the tray, rammed by three men, charge from the rear box, breech shut, lanyard man jumps down, elevation, crew duck, officer's arm drop, FIRE (flash, fire and smoke along the bore, a ring of ground dust, a pressure ring, camera shake, recoil and the carriage rocking), then a second round from 150 m.
   - wreck: a direct hit, the front of the barrel thrown off and tumbling, debris, crew knocked down, a burning, smoking hulk.
 - **Not done:** the third round (two are shown). The flash is a plain glow ball. The tracks are drawn on bare sand.
+
+## Zombies (Question Chat, started 07:02, done 07:32 2026-11-10)
+
+Dead soldiers back on their feet, in our basic army style. They use the soldier skeleton, so every pose, clip, IK hand and death works on them as it does on our men.
+- **Models** (`scripts/units/zombie_builder.gd`, `scripts/units/zombie.gd` class Zombie). The soldier body with faded, mud-caked, stained cloth, grey-green skin, pale eyes, an open jaw, a torn chest with the ribs showing, a ripped bare forearm and rags.
+  - Shambler: helmet or bare head, some in gas masks. 1020 / 332 / 192 triangles (close / mid / far).
+  - Runner: bare-headed, thin and fresher. 868 / 312 / 192.
+  - Brute: broad, scaled up 1.25, with scrap-iron plates, a bucket helm, a chain and a nailed timber club. 1324 / 444 / 240.
+  - Zombie can also take its legs off (the shins shrink to stumps) and char black as it burns.
+  - `soldier_builder.gd` gained one look key, `bare` (no helmet), for the zombies.
+- **Moves** (`scripts/units/anim/clips_zombie.gd`):
+  - gaits: shamble (arms out, one-arm-dead or limp), hunched sprint, the brute's walk and charge, a crawl on the arms;
+  - attacks: grab and bite, claw swipes, the runner's crouch, leap and landing, the brute's two-handed club smash;
+  - climbing: wall climb, belly over the top, the hunched heap at the wall foot, clawing at a gate or wall;
+  - deaths: stumble (shot, keeps coming), head-shot drop, legs shot off, burning, the brute's slow fall after several hits.
+- **Videos** (`results/units/anim/zombie_*.mp4`, made with `tools/zombie_clips.gd`):
+  - look: the gallery, close, mid and far.
+  - moves: every gait, a stagger, a turn, the charge, the crawl.
+  - attacks: a bite, a leap, the club.
+  - walls: shamblers heap at the wall foot and runners climb their backs, over the top and down inside. At the gate two claw at it, then the brute smashes it in and splinters fly.
+  - trench: a shambler snags on the wire, falls in, gets up and claws out the far side. Another is stuck at the trench wall. A runner jumps the wire and the trench. The brute tears through the wire, steps down and climbs out.
+  - horde: 16 shamblers, 2 runners and the brute against five rifles and the officer. Head shots drop them and wounds only slow them. One runner leaps in on a rifleman and the officer's pistol finishes it.
+  - deaths: a head shot, legs shot away then crawling, fire, and the brute.
+- **Rough edges:**
+  - The jump down from the wall top is a quick tumble.
+  - The fallen brute lies slightly raised on its club.
+  - Hits are small dark sprays (no gore).
