@@ -517,7 +517,7 @@ func _build_light() -> void:
 	beam.name = "Beam"
 	beam.mesh = cm
 	beam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	beam.transform = Transform3D(Basis(Vector3.RIGHT, -PI * 0.5), Vector3(0, 0, -0.47 - BEAM_LEN * 0.5))
+	beam.transform = Transform3D(Basis(Vector3.RIGHT, PI * 0.5), Vector3(0, 0, -0.47 - BEAM_LEN * 0.5))
 	light_head.add_child(beam)
 	spot = SpotLight3D.new()
 	spot.position = Vector3(0, 0, -0.5)
