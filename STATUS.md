@@ -28,3 +28,8 @@
 ## Red coats vs our troops: fights (Building Chat 1), go 2026-11-10 ~07:55, ETA about 2-3 h
 - Charge clash, three melee duels, storming a trench, dragoons riding in. Pictures only, mixed outcomes, blast-style hits and falls (no blood).
 - BUILT 2026-11-10 08:05 (7290e32), APPROVED by the user 08:06. Sheets: results/units/redcoats/fight_*.png. Report: REDCOATS_REPORT.md (Fights section).
+
+## Armoured melee troops (Building Chat 1), go 2026-11-10 ~08:10, ETA about 3-4 h (by ~11:10-12:10)
+- Our side: full heavy WW1 trench armour (plates, brow-plate visor helmet), tall slit shields, trench clubs / maces / spades, pistol back-up.
+- Moves: heavy walk, shield wall lock and step-push, strikes over the shields, break into the rush, swings, shield block and bash, pistol, hits, deaths, blast throws.
+- Output: move sheets, five short videos (wall, rush, strikes, pistol, battle vs red coats), battle stills. BUILT 2026-11-10 08:39, well under the ETA; waiting for the user's look. Files in results/units/armour/. Report: ARMOUR_REPORT.md.
