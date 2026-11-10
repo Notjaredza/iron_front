@@ -142,7 +142,7 @@ The horse and the gun have one mesh each so far; neither has a mid or far mesh y
 
 # Fights: red coats against our troops (Building Chat 1, 2026-11-10)
 
-The user asked for the two sides fighting each other: the charge clash, melee, storming a trench, and the dragoons riding in. Pictures only, mixed outcomes (each side wins some), in the blasts' style (hard hits and falls, smoke and flashes, no blood). Go given ~07:55; built 08:05.
+The user asked for the two sides fighting each other: the charge clash, melee, storming a trench, and the dragoons riding in. Pictures only, mixed outcomes (each side wins some), in the blasts' style (hard hits and falls, smoke and flashes, no blood). Go given ~07:55; built 08:05; APPROVED by the user 08:06.
 
 ## What each sheet shows (results/units/redcoats/)
 - **fight_clash.png** (8 frames, side view): the red coats come on with the bayonet while ours fire. Some red coats fall to the fire, then the lines meet. Thrusts, parries and butt strokes follow, and men fall on both sides.

@@ -27,4 +27,4 @@
 
 ## Red coats vs our troops: fights (Building Chat 1), go 2026-11-10 ~07:55, ETA about 2-3 h
 - Charge clash, three melee duels, storming a trench, dragoons riding in. Pictures only, mixed outcomes, blast-style hits and falls (no blood).
-- BUILT 2026-11-10 08:05, waiting for the user's look. Sheets: results/units/redcoats/fight_*.png. Report: REDCOATS_REPORT.md (Fights section).
+- BUILT 2026-11-10 08:05 (7290e32), APPROVED by the user 08:06. Sheets: results/units/redcoats/fight_*.png. Report: REDCOATS_REPORT.md (Fights section).
