@@ -60,6 +60,8 @@ They are plain living soldiers. The test field comes in a later round; this roun
 
 # Red coats, round 2 (Building Chat 1, 2026-11-10, built by about 01:11)
 
+**APPROVED by the user 2026-11-10 05:57.**
+
 More troops for the red coats, each fighting its own way. Plain soldiers, no strange tech. **Pictures and move sheets only**
 (the user: "pics to save time"), so there are no videos and no test field this round.
 

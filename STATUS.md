@@ -23,4 +23,4 @@
 
 ## Red coats round 2 (Building Chat 1), go 2026-11-10 ~00:50, ETA about 2-4 h (by ~03:00-04:50)
 - Grenadiers (mitre caps, lit grenades), light infantry (skirmish: cover, kneel, fire, low runs, prone), a 6-pounder field gun and its five-man crew (the drill: sponge, load, ram, prime, lay, fire, recoil, run up), dragoons on a new horse model (walk, trot, gallop, charge, rear, fall; sabre carry, raise, cut, point).
-- Pictures and move sheets only (the user: "pics to save time"). BUILT 2026-11-10 ~01:11, inside the ETA; waits for the user's look. Report: REDCOATS_REPORT.md (round 2 section).
+- Pictures and move sheets only (the user: "pics to save time"). BUILT 2026-11-10 ~01:11 (3d5d5f4), APPROVED by the user 05:57. Report: REDCOATS_REPORT.md (round 2 section).
