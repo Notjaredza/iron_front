@@ -248,3 +248,24 @@ pushing, panel flats and a crane car at the front plus a crew coach; built all i
       1. A near miss stops the work, and the gang drop flat.
       2. A direct hit on the crane car snaps the boom, which folds down; the hanging panel drops.
       3. The foreman is knocked over and the winch house burns.
+
+## War airship (Question Chat, 2026-11-10)
+
+The user asked for army airships, starting with just one: two cannons shooting down at the ground and a few MGs
+for air defence. Answers: a rigid war zeppelin; belly turrets; MGs on top, in the tail and at the sides; a
+searchlight for night; videos of the look and crew, flying and mooring, bombarding, and an AA fight ending shot down.
+
+- `scripts/air/airship.gd` (class Airship; the air round's files are only reused):
+  - **hull:** a 90 m framed cigar (16 sides), panel bands, a dark middle band, cruciform tail fins with rudders and elevators; built as two halves (fore and aft) that can break apart at the middle;
+  - **gondola:** a long control car under the nose, with windows, the two window MGs and the searchlight under its nose;
+  - **guns:** two belly turrets (front and back) that turn and dip to aim down, with recoil and muzzles; four AA MGs (top nest, tail, gondola windows left and right);
+  - **engines:** two side pods with pusher propellers and exhaust points;
+  - **searchlight:** a turning lamp with a faint additive beam cone and a real spot light;
+  - **damage:** `set_burn(z0, z1)` swaps skin for bare black framework along a burn front, `set_break(a)` folds the two halves;
+  - **Triangles, close / far:** 21464 / 184.
+- `tools/ship_clips.gd` (extends layer_clips): five videos in results/units/anim/.
+  - **ship_look:** the whole ship, then close on the front turret and window MGs, the top nest, the tail nest and fins, the engine pods, the searchlight, and the far look; gunners at their guns.
+  - **ship_moor:** comes in low over the field, drops lines from the nose; two gangs of six haul her in to a 24 m mast; nose in the cup, engines stop.
+  - **ship_bombard:** cruises at 115 m over an enemy battery; the turrets take turns, five shots each; three gun pits are hit, the guns thrown over, and they burn.
+  - **ship_night:** dark; the searchlight sweeps the ground, finds the battery and holds on it; both turrets fire down the beam.
+  - **ship_shotdown:** an enemy fighter makes a head-on pass, the top and window MGs fire; it comes round for a stern attack, the tail gunner fires; incendiary rounds start a fire that runs along the hull; she breaks her back and falls burning to the ground.
