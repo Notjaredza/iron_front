@@ -11,6 +11,7 @@ const RADIUS := 200.0
 const SHOW_H := 260.0          # camera height above which there are no tufts
 const TUFT_P := 0.16            # spots with a little cluster of tufts
 const FLOWER_P := 0.035
+const ROW := 2.0 / 0.9           # crop row spacing, matches the ground shader rows
 
 var data: MapData
 var mat: Material
@@ -19,7 +20,8 @@ var _meshes: Array[Mesh] = []
 
 
 func _ready() -> void:
-	_meshes = [_tuft_mesh(), _flower_mesh(Color(0.95, 0.95, 0.90)), _flower_mesh(Color(0.96, 0.80, 0.26))]
+	_meshes = [_tuft_mesh(), _flower_mesh(Color(0.95, 0.95, 0.90)), _flower_mesh(Color(0.96, 0.80, 0.26)),
+		_tall_mesh(), _wheat_mesh()]
 
 
 func clear() -> void:
@@ -57,7 +59,7 @@ func update(target: Vector3, height: float) -> void:
 func _build(key: Vector2i) -> Node3D:
 	var node := Node3D.new()
 	add_child(node)
-	var lists: Array = [[], [], []]
+	var lists: Array = [[], [], [], [], []]
 	var n := int(TILE / STEP)
 	for gz in n:
 		for gx in n:
@@ -77,6 +79,8 @@ func _build(key: Vector2i) -> Node3D:
 			var f := data.walk[cz * data.w + cx]
 			if f == 0 or f == MapData.FLAT_NONE or data.busy[cz * data.w + cx] == 1:
 				continue
+			if (data.feat[cz * data.w + cx] & (MapData.F_FIELD | MapData.F_STREAM)) != 0:
+				continue
 			var which := 0 if r < TUFT_P else 1 + (k / 19) % 2
 			var count := (2 + (k / 23) % 4) if which == 0 else (1 + (k / 29) % 3)
 			for q in count:
@@ -85,7 +89,8 @@ func _build(key: Vector2i) -> Node3D:
 				var s := 0.85 + 0.6 * float((kq / 7) % 100) / 100.0
 				var b := Basis(Vector3.UP, float((kq / 3) % 628) / 100.0).scaled(Vector3(s, s, s))
 				lists[which].append(Transform3D(b, Vector3(p.x + off.x, MapData.level_y(f), p.y + off.y)))
-	for i in 3:
+	_patches(key, lists)
+	for i in lists.size():
 		var l: Array = lists[i]
 		if l.is_empty():
 			continue
@@ -104,6 +109,85 @@ func _build(key: Vector2i) -> Node3D:
 		mi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
 		node.add_child(mi)
 	return node
+
+
+## Map round 3: tall grass clumps on F_TALL cells and wheat on wheat fields (crop 1), per 8 m cell.
+func _patches(key: Vector2i, lists: Array) -> void:
+	var cn := int(TILE / MapData.CELL)
+	var cx0 := int(key.x * TILE / MapData.CELL)
+	var cz0 := int(key.y * TILE / MapData.CELL)
+	for gz in cn:
+		for gx in cn:
+			var cx := cx0 + gx
+			var cz := cz0 + gz
+			if cx < 0 or cz < 0 or cx >= data.w or cz >= data.h:
+				continue
+			var i := cz * data.w + cx
+			var f := data.walk[i]
+			if f == 0 or f == MapData.FLAT_NONE or data.busy[i] == 1:
+				continue
+			var ft := data.feat[i]
+			var which := -1
+			var count := 0
+			if (ft & MapData.F_FIELD) != 0 and data.crop[i] == 1:
+				which = 4
+				count = 14
+			elif (ft & MapData.F_TALL) != 0:
+				which = 3
+				count = 7
+			if which < 0:
+				continue
+			var y := MapData.level_y(f)
+			for q in count:
+				var kq := hash(Vector3i(cx, cz, q * 31 + data.seed))
+				var px := (cx + float(kq % 1000) / 1000.0) * MapData.CELL
+				var pz := (cz + float((kq / 1000) % 1000) / 1000.0) * MapData.CELL
+				if which == 4:
+					# Wheat in rows: snap across the rows so the field reads as planted.
+					var along_x := data.crop[i] % 2 == 1
+					if along_x:
+						pz = (floorf(pz / ROW) + 0.25) * ROW
+					else:
+						px = (floorf(px / ROW) + 0.25) * ROW
+				var s := 0.8 + 0.5 * float((kq / 7) % 100) / 100.0
+				var b := Basis(Vector3.UP, float((kq / 3) % 628) / 100.0).scaled(Vector3(s, s * (0.9 + 0.2 * float((kq / 11) % 10) / 10.0), s))
+				lists[which].append(Transform3D(b, Vector3(px, y, pz)))
+
+
+## A tall grass clump: nine long bending blades, dry tips.
+func _tall_mesh() -> ArrayMesh:
+	var st := _St.new()
+	for i in 9:
+		var a := i * TAU / 9.0 + 0.4 * sin(i * 1.7)
+		var dir := Vector3(cos(a), 0, sin(a))
+		var side := Vector3(-dir.z, 0, dir.x) * 0.07
+		var root := dir * (0.1 + 0.08 * (i % 3))
+		var h := 0.95 + 0.35 * ((i * 5) % 4) / 3.0
+		var mid := dir * 0.3 + Vector3(0, h * 0.55, 0)
+		var tip := dir * 0.62 + Vector3(0, h, 0)
+		var col := Color(0.46, 0.58, 0.24) if i % 2 == 0 else Color(0.56, 0.62, 0.30)
+		st.two_sided(root - side, root + side, mid, col)
+		st.two_sided(mid - side * 0.8, mid + side * 0.8, tip, Color(0.70, 0.68, 0.40) if i % 3 == 0 else col.lightened(0.1))
+	return st.mesh()
+
+
+## A wheat clump: seven upright stalks with golden ears.
+func _wheat_mesh() -> ArrayMesh:
+	var st := _St.new()
+	var stalk := Color(0.80, 0.68, 0.34)
+	var ear := Color(0.90, 0.76, 0.38)
+	for i in 7:
+		var a := i * TAU / 7.0
+		var r := 0.12 + 0.1 * (i % 3)
+		var p := Vector3(cos(a) * r, 0, sin(a) * r)
+		var lean := Vector3(cos(a), 0, sin(a)) * 0.06
+		var h := 0.9 + 0.15 * ((i * 3) % 4) / 3.0
+		var side := Vector3(-sin(a), 0, cos(a)) * 0.025
+		var top := p + lean + Vector3(0, h, 0)
+		st.two_sided(p - side, p + side, top, stalk)
+		var e0 := top - Vector3(0, 0.2, 0)
+		st.two_sided(e0 - side * 2.2, e0 + side * 2.2, top + Vector3(0, 0.06, 0), ear)
+	return st.mesh()
 
 
 ## Five thin blades, each drawn on both sides.

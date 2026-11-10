@@ -12,9 +12,17 @@ extends RefCounted
 
 const CELL := 8.0
 const BLOCK := 4                               # cells per coarse block
-const LEVEL_Y := [-3.0, 0.0, 8.0, 16.0]        # ground height of each level (water bed, base, plateau 2, plateau 3)
-const WATER_Y := -1.0
+const LEVEL_Y := [-5.0, 0.0, 8.0, 16.0]        # ground height of each level (water bed, base, plateau 2, plateau 3)
+const WATER_Y := -2.2
 const FLAT_NONE := 255                         # walk value of a cell that holds a cliff edge
+const F_STREAM := 1                            # a small stream (walkable, slow)
+const F_FORD := 2                              # a ford across a river (walkable, slow), banks included
+const F_MARSH := 4                             # boggy ground with pools and reeds (walkable, slow)
+const F_WOOD := 8                              # woods
+const F_FIELD := 16                            # a crop field (see crop)
+const F_TALL := 32                             # tall grass
+const F_HEDGE := 64                            # a hedgerow runs through this cell
+const F_TREE := 128                            # a lone tree stands here
 
 var seed := 0
 var w := 1000                                  # cells across (8 km)
@@ -25,6 +33,16 @@ var coarse := PackedByteArray()                # cw * ch levels 0..3
 var field := PackedByteArray()                 # (w + 1) * (h + 1) corner levels 0..3
 var walk := PackedByteArray()                  # w * h: the level of a flat cell, or FLAT_NONE
 var busy := PackedByteArray()                  # w * h: 1 where ground detail must keep off (rails, houses, ramps)
+## Nature (map round 3), one byte of flags per cell (see the F_ constants), the crop of a field cell, and the
+## distance of a water cell from the bank in cells (1 at the bank, up to 7).
+var feat := PackedByteArray()
+var crop := PackedByteArray()                  # 0 none, 1 wheat, 2 green crop, 3 ploughed, 4 hay
+var wdepth := PackedByteArray()
+## Fords: {"p0", "p1": Vector2 (metres, the two bank tops on the centre line), "dir": Vector2 (p0 to p1, unit),
+## "w": float (metres wide), "river": int}.
+var fords: Array = []
+## Streams: Array of PackedVector2Array (metres), drawn from feat F_STREAM; kept for later (flow direction).
+var streams: Array = []
 ## Ramps: {"t": upper level, "axis": 0 for x or 1 for z, "s": +1/-1 (direction from high to low), "e": float (the
 ## cliff line, in cells along the axis), "a": int (the first lateral cell), "w": int (cells wide)}.
 var ramps: Array = []
@@ -39,6 +57,18 @@ var notes: Array[String] = []
 
 func size_m() -> Vector2:
 	return Vector2(w * CELL, h * CELL)
+
+
+func has(x: int, z: int, flag: int) -> bool:
+	return x >= 0 and z >= 0 and x < w and z < h and (feat[z * w + x] & flag) != 0
+
+
+## Walkable for an army without bridges: dry flat ground, streams, marsh and fords (deep water is not).
+func can_walk(x: int, z: int) -> bool:
+	var i := z * w + x
+	if walk[i] == 0:
+		return (feat[i] & F_FORD) != 0
+	return true
 
 
 func corner(x: int, z: int) -> int:

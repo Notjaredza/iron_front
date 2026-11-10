@@ -1,7 +1,7 @@
 extends SceneTree
 ## Iron Front: the map's automatic check (headless). For each seed it:
-## 1. Reach: every flat area of 16 cells or more can be reached from the main base area by walking and ramps. Water
-##    and shore count as crossable until bridges come; cliffs don't.
+## 1. Reach: every flat area of 16 cells or more can be reached from the main base area by walking, ramps and
+##    fords. Deep water and cliffs block (map round 3: fords, no bridges yet).
 ## 2. Walls: every cliff wall corner is shared by exactly two wall pieces (one at the map edge), and the chunks on
 ##    each side of a chunk border build it at the same place. This means no gaps in the cliffs.
 ## 3. Holes: rays straight down at thousands of points, near chunk borders too, all hit ground at the right height.
@@ -114,18 +114,23 @@ func _reach(d: MapData) -> void:
 		for x in d.w:
 			var f := d.walk[z * d.w + x]
 			var v := -1
+			var ford := d.has(x, z, MapData.F_FORD)
 			if f == MapData.FLAT_NONE:
 				var hi := maxi(maxi(d.corner(x, z), d.corner(x + 1, z)), maxi(d.corner(x, z + 1), d.corner(x + 1, z + 1)))
-				if hi <= 1:
+				var lo := mini(mini(d.corner(x, z), d.corner(x + 1, z)), mini(d.corner(x, z + 1), d.corner(x + 1, z + 1)))
+				if hi <= 1 and (lo >= 1 or ford):
 					v = 1
+			elif f == 0:
+				v = 1 if ford else -1
 			else:
-				v = maxi(1, f)
+				v = f
 			lvl[z * d.w + x] = v
 	var lab := PackedInt32Array()
 	lab.resize(n)
 	lab.fill(-1)
 	var sizes := PackedInt32Array()
 	var levels := PackedInt32Array()
+	var firsts := PackedInt32Array()
 	var q := PackedInt32Array()
 	for i in n:
 		if lvl[i] < 0 or lab[i] >= 0:
@@ -133,6 +138,7 @@ func _reach(d: MapData) -> void:
 		var c := sizes.size()
 		sizes.append(0)
 		levels.append(lvl[i])
+		firsts.append(i)
 		q.clear()
 		q.append(i)
 		lab[i] = c
@@ -183,10 +189,35 @@ func _reach(d: MapData) -> void:
 		if sizes[c] >= 16:
 			cut += 1
 			cut_cells += sizes[c]
+			if cut <= 4:
+				print("  cut off: %d cells, level %d, at cell %d, %d" % [sizes[c], levels[c], firsts[c] % d.w, firsts[c] / d.w])
 		else:
 			bits += 1
 	_ok(bad_ramps == 0, "every ramp runs from a flat top one level down to flat ground (%d ramps)" % d.ramps.size())
 	_ok(cut == 0, "every area reachable: %d plateau areas, %d cut off (%d cells); %d tiny corner bits under 16 cells" % [plateaus, cut, cut_cells, bits])
+	# Map round 3: fords per river, and the nature shares.
+	var per := {}
+	for fd: Dictionary in d.fords:
+		if int(fd["river"]) < 0:
+			continue
+		per[fd["river"]] = int(per.get(fd["river"], 0)) + 1
+	var fmin := 99
+	var fmax := 0
+	for r in per:
+		fmin = mini(fmin, per[r])
+		fmax = maxi(fmax, per[r])
+	_ok(per.size() >= 3 and fmin >= 3, "fords: %d rivers, %d-%d fords each (%d in all)" % [per.size(), fmin, fmax, d.fords.size()])
+	var cnt := [0, 0, 0, 0, 0, 0]
+	var open := 0
+	for i in d.w * d.h:
+		var ft := d.feat[i]
+		if d.walk[i] != 0 and d.walk[i] != MapData.FLAT_NONE:
+			open += 1
+		for b in 6:
+			if ft & [MapData.F_WOOD, MapData.F_TALL, MapData.F_FIELD, MapData.F_STREAM, MapData.F_MARSH, MapData.F_HEDGE][b]:
+				cnt[b] += 1
+	var wood_p: float = 100.0 * cnt[0] / float(open)
+	_ok(wood_p > 15.0 and wood_p < 25.0, "woods %.1f %% of dry ground (tall grass %.1f %%, fields %d, stream %d, marsh %d, hedge %d cells)" % [wood_p, 100.0 * cnt[1] / float(open), cnt[2], cnt[3], cnt[4], cnt[5]])
 
 
 func _cell(d: MapData, r: Dictionary, along: int, across: int) -> int:
@@ -316,6 +347,8 @@ func _holes(d: MapData, res: Array, ncx: int, ncz: int) -> void:
 				want = MapData.WATER_Y if lo == 0 else MapData.level_y(lo)
 			else:
 				want = MapData.WATER_Y if f == 0 else MapData.level_y(f)
+				if f == 1 and d.has(cx_, cz_, MapData.F_STREAM):
+					want = MapMesher.STREAM_Y
 			if best == -INF:
 				missed += 1
 				if missed <= 5:

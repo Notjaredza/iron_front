@@ -24,6 +24,7 @@ var comp_size := PackedInt32Array()
 var comp_level := PackedByteArray()
 var rail_mask := PackedByteArray()
 var lowered := Rect2i()            # blocks lowered or filled by the last _ramps()
+var river_paths: Array = []        # block paths of the rivers (for fords)
 
 
 static func generate(seed: int, w := 1000, h := 1500) -> MapData:
@@ -67,6 +68,9 @@ func _run(seed: int, w: int, h: int) -> MapData:
 	_places()
 	_busy()
 	stages += ", places %d" % (Time.get_ticks_msec() - tt)
+	tt = Time.get_ticks_msec()
+	MapNature.run(d, rng, river_paths)
+	stages += ", nature %d" % (Time.get_ticks_msec() - tt)
 	d.notes.append("stages ms: " + stages)
 	d.gen_ms = Time.get_ticks_msec() - t0
 	d.notes.append("generated in %d ms: %d ramps, %d rail lines, %d places" % [d.gen_ms, d.ramps.size(), d.rails.size(), d.places.size()])
@@ -244,14 +248,22 @@ func _water() -> void:
 	cost.resize(n)
 	for i in n:
 		cost[i] = -1.0 if dist[i] < 2 else 1.0 + 3.0 * (mz.get_noise_2d(i % d.cw, i / d.cw) + 1.0)
-	var rivers := 2 if d.ch > 100 else 1
+	# Three rivers (map round 3): the main one runs down the map, two blocks wide (64 m); a second crosses it, and
+	# a third runs down the other side. The narrow ones are one block (32 m), wider now and then.
+	var rivers := 3 if d.ch > 100 else 1
+	var first_x := -1
 	for r in rivers:
-		var vertical := r == 0
+		var vertical := r != 1
 		var path := PackedInt32Array()
 		for tries in 12:
 			var start := -1
 			if vertical:
 				var x := rng.randi_range(d.cw / 5, d.cw * 4 / 5)
+				if r == 2 and first_x >= 0:
+					# The third river keeps to the other side of the main one.
+					x = rng.randi_range(d.cw / 8, d.cw / 3) if first_x > d.cw / 2 else rng.randi_range(d.cw * 2 / 3, d.cw * 7 / 8)
+				elif r == 0:
+					x = rng.randi_range(d.cw / 3, d.cw * 2 / 3)
 				start = x
 			else:
 				var y := rng.randi_range(d.ch / 5, d.ch * 4 / 5)
@@ -266,16 +278,20 @@ func _water() -> void:
 			path = _astar(start, goal, -1 if vertical else d.cw - 1, d.ch - 1 if vertical else -1, cost, false)
 			if path.size() > 0:
 				break
+		if r == 0 and path.size() > 0:
+			first_x = path[0] % d.cw
 		var wide := false
 		for k in path.size():
 			var i := path[k]
 			d.coarse[i] = 0
 			if k % 40 == 0:
-				wide = rng.randf() < 0.35
+				wide = r == 0 or rng.randf() < 0.25
 			if wide:
 				var side := i + (1 if vertical else d.cw)
 				if side < n and cost[side] >= 0.0 and (not vertical or side % d.cw != 0):
 					d.coarse[side] = 0
+		if path.size() > 0:
+			river_paths.append(path)
 		if path.size() > 0:
 			d.notes.append("river %d: %d blocks" % [r, path.size()])
 

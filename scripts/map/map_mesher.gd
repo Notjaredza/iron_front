@@ -23,6 +23,21 @@ const WATER_A := 0.5
 const WINDOW_A := 0.25
 
 const C_WATER := Color(0.23, 0.46, 0.66, WATER_A)
+## Map round 3: water by depth (bank, middle, deep), foam, the shallow ford, streams, marsh, fields, woods floor.
+const SHALLOW_A := 0.55
+const MARSH_A := 0.65
+const FIELD_A_X := 0.88            # crop rows along x
+const FIELD_A_Z := 0.92            # crop rows along z
+const C_WATERS := [Color(0.27, 0.52, 0.65, WATER_A), Color(0.24, 0.48, 0.63, WATER_A), Color(0.20, 0.43, 0.59, WATER_A)]
+const C_FOAM := Color(0.80, 0.88, 0.92, WATER_A)
+const C_FORD := Color(0.36, 0.53, 0.57, SHALLOW_A)
+const C_FORD_BANK := Color(0.50, 0.46, 0.37)
+const C_STREAM := Color(0.28, 0.50, 0.62, WATER_A)
+const C_STREAM_BANK := Color(0.45, 0.36, 0.24)
+const C_MARSH := Color(0.36, 0.45, 0.25, MARSH_A)
+const C_CROPS := [Color(0, 0, 0), Color(0.82, 0.70, 0.36), Color(0.44, 0.60, 0.22), Color(0.50, 0.36, 0.23), Color(0.72, 0.68, 0.42)]
+const STREAM_Y := -0.45
+const FOAM_OUT := 1.55             # where the bank meets the water (m out from the cliff line)
 const GRASS_A := 0.75              # grass ground: the shader paints patches on it
 const C_LEVEL := [Color(0.23, 0.46, 0.66), Color(0.40, 0.60, 0.24, GRASS_A), Color(0.45, 0.64, 0.26, GRASS_A), Color(0.50, 0.67, 0.29, GRASS_A)]
 const C_LIP := Color(0.32, 0.49, 0.19)
@@ -86,6 +101,8 @@ func _build(cx: int, cz: int) -> Dictionary:
 			if d.walk[z * d.w + x] == MapData.FLAT_NONE:
 				_edge_cell(x, z)
 	_ramps()
+	_fords()
+	_stream_sides()
 	_skirt()
 	_rails()
 	_houses()
@@ -96,7 +113,14 @@ func _build(cx: int, cz: int) -> Dictionary:
 	co = PackedColorArray()
 	_details()
 	var detail := _take()
-	return {"arrays": arrays, "tris": tris, "detail": detail, "detail_tris": vt.size() / 3, "walls": wall_keys,
+	var detail_tris := vt.size() / 3
+	vt = PackedVector3Array()
+	nm = PackedVector3Array()
+	co = PackedColorArray()
+	var trees := _trees()
+	var canopy := _take()
+	return {"arrays": arrays, "tris": tris, "detail": detail, "detail_tris": detail_tris, "walls": wall_keys,
+		"trees": trees, "canopy": canopy, "canopy_tris": vt.size() / 3,
 		"aabb": AABB(Vector3(x0 * MapData.CELL, SKIRT_Y, z0 * MapData.CELL), Vector3((x1 - x0) * MapData.CELL, 40.0, (z1 - z0) * MapData.CELL))}
 
 
@@ -177,6 +201,60 @@ func _ly(level: int) -> float:
 	return MapData.WATER_Y if level == 0 else MapData.level_y(level)
 
 
+## The paint of a flat cell (map round 3): flats only merge with cells of the same paint.
+const P_PLAIN := 0
+const P_STREAM := 1
+const P_MARSH := 2
+const P_WOOD := 3
+const P_CROP := 4                  # + crop 1-4
+const P_TALL := 9
+const P_WATER := 10                # + depth bucket 0-2
+const P_FORD := 20
+
+
+func _paint(i: int) -> int:
+	var f := d.feat[i]
+	if d.walk[i] == 0:
+		if (f & MapData.F_FORD) != 0:
+			return P_FORD
+		var wd := d.wdepth[i]
+		return P_WATER + (0 if wd <= 1 else (1 if wd <= 3 else 2))
+	if (f & MapData.F_STREAM) != 0:
+		return P_STREAM
+	if (f & MapData.F_MARSH) != 0:
+		return P_MARSH
+	if (f & MapData.F_FIELD) != 0:
+		return P_CROP + d.crop[i]
+	if (f & MapData.F_WOOD) != 0:
+		return P_WOOD
+	if (f & MapData.F_TALL) != 0:
+		return P_TALL
+	return P_PLAIN
+
+
+func _paint_col(pk: int, v: int) -> Color:
+	if pk >= P_FORD:
+		return C_FORD
+	if pk >= P_WATER:
+		return C_WATERS[pk - P_WATER]
+	match pk:
+		P_STREAM:
+			return C_STREAM
+		P_MARSH:
+			return C_MARSH
+		P_WOOD:
+			var g: Color = C_LEVEL[v]
+			return Color(g.r * 0.72 + 0.04, g.g * 0.72 + 0.02, g.b * 0.7, GRASS_A)
+		P_TALL:
+			var g2: Color = C_LEVEL[v]
+			return Color(lerpf(g2.r, 0.62, 0.3), lerpf(g2.g, 0.63, 0.3), lerpf(g2.b, 0.30, 0.3), GRASS_A)
+	if pk > P_CROP and pk < P_TALL:
+		var k := pk - P_CROP
+		var cc: Color = C_CROPS[k]
+		return Color(cc.r, cc.g, cc.b, FIELD_A_X if k % 2 == 1 else FIELD_A_Z)
+	return C_WATER if v == 0 else C_LEVEL[v]
+
+
 # --------------------------------------------------------------------------------------------------------- flats
 
 func _flats() -> void:
@@ -192,14 +270,15 @@ func _flats() -> void:
 			var v := d.walk[z * d.w + x]
 			if v == MapData.FLAT_NONE:
 				continue
+			var pk := _paint(z * d.w + x)
 			var xe := x + 1
-			while xe < x1 and seen[(z - z0) * cw + xe - x0] == 0 and d.walk[z * d.w + xe] == v:
+			while xe < x1 and seen[(z - z0) * cw + xe - x0] == 0 and d.walk[z * d.w + xe] == v and _paint(z * d.w + xe) == pk:
 				xe += 1
 			var ze := z + 1
 			while ze < z1:
 				var ok := true
 				for xx in range(x, xe):
-					if seen[(ze - z0) * cw + xx - x0] == 1 or d.walk[ze * d.w + xx] != v:
+					if seen[(ze - z0) * cw + xx - x0] == 1 or d.walk[ze * d.w + xx] != v or _paint(ze * d.w + xx) != pk:
 						ok = false
 						break
 				if not ok:
@@ -209,7 +288,9 @@ func _flats() -> void:
 				for xx in range(x, xe):
 					seen[(zz - z0) * cw + xx - x0] = 1
 			var y := _ly(v)
-			var col: Color = C_WATER if v == 0 else C_LEVEL[v]
+			if pk == P_STREAM:
+				y = STREAM_Y
+			var col := _paint_col(pk, v)
 			var c := MapData.CELL
 			quad(Vector3(x * c, y, z * c), Vector3(xe * c, y, z * c), Vector3(xe * c, y, ze * c), Vector3(x * c, y, ze * c), col, Vector3.UP)
 
@@ -306,7 +387,7 @@ func _edge_cell(x: int, z: int) -> void:
 	var hi: int = v.max()
 	var c := MapData.CELL
 	var base_y := _ly(lo)
-	var col: Color = C_WATER if lo == 0 else C_LEVEL[lo]
+	var col: Color = C_WATERS[0] if lo == 0 else C_LEVEL[lo]
 	quad(Vector3(x * c, base_y, z * c), Vector3((x + 1) * c, base_y, z * c), Vector3((x + 1) * c, base_y, (z + 1) * c), Vector3(x * c, base_y, (z + 1) * c), col, Vector3.UP)
 	for t in range(lo + 1, hi + 1):
 		var poly := ms_poly(v, t)
@@ -324,7 +405,7 @@ func _edge_cell(x: int, z: int) -> void:
 ## The wall profile at one corner point: [offset out, height] pairs, top to bottom.
 func _profile(t: int, key: int) -> Array:
 	if t == 1:
-		return [[0.0, 0.0], [0.6, -0.45], [1.7, -1.5], [2.8, MapData.LEVEL_Y[0]]]
+		return [[0.0, 0.0], [0.5, -0.55], [1.4, -1.95], [3.2, MapData.LEVEL_Y[0]]]
 	var h1: float = MapData.level_y(t)
 	var h0: float = MapData.level_y(t - 1)
 	var j1 := _h01(key) - 0.5
@@ -349,8 +430,18 @@ func _wall(s: Array, t: int) -> void:
 	var n2: Vector2 = s[2]
 	var out := Vector3(n2.x, 0.4, n2.y)
 	var cols := [C_LIP, C_DIRT_HI, C_SAND] if t == 1 else [C_LIP, C_DIRT_HI, C_DIRT_LO]
-	for i in 3:
-		quad(ap[i], ap[i + 1], aq[i + 1], aq[i], cols[i], out)
+	# At a ford the bank is a gravel slope instead (drawn by _fords); the wall still counts for the checks.
+	var skip := t == 1 and _at_ford((p + q) * 0.5)
+	if not skip:
+		for i in 3:
+			quad(ap[i], ap[i + 1], aq[i + 1], aq[i], cols[i], out)
+	if t == 1 and not skip:
+		# Foam where the bank meets the water.
+		var y := MapData.WATER_Y + 0.03
+		var o1 := FOAM_OUT + 1.3 + 0.8 * _h01(kp * 7 + 1)
+		var o2 := FOAM_OUT + 1.3 + 0.8 * _h01(kq * 7 + 1)
+		quad(Vector3(p.x + np_.x * FOAM_OUT, y, p.y + np_.y * FOAM_OUT), Vector3(q.x + nq.x * FOAM_OUT, y, q.y + nq.y * FOAM_OUT),
+			Vector3(q.x + nq.x * o2, y, q.y + nq.y * o2), Vector3(p.x + np_.x * o1, y, p.y + np_.y * o1), C_FOAM, Vector3.UP)
 	if t >= 2:
 		var y := MapData.level_y(t - 1) + 0.1
 		var wp := BANK + APRON * (0.6 + 0.8 * _h01(kp * 13 + 3))
@@ -406,6 +497,98 @@ func _ramps() -> void:
 		var side := Vector3(0, 0, 1) if int(r["axis"]) == 0 else Vector3(1, 0, 0)
 		tri(pts["t0"], pts["f0"], pts["b0"], C_RAMP_SIDE, -side + Vector3.UP * 0.5)
 		tri(pts["t1"], pts["f1"], pts["b1"], C_RAMP_SIDE, side + Vector3.UP * 0.5)
+
+
+# ------------------------------------------------------------------------------------- fords and streams (round 3)
+
+## True where a bank point (metres) is inside a ford's crossing, so its cliff wall gives way to the gravel slope.
+func _at_ford(m: Vector2) -> bool:
+	var c := MapData.CELL
+	for f: Dictionary in d.fords:
+		var ax: int = f["axis"]
+		var along := m.x if ax == 0 else m.y
+		var across := m.y if ax == 0 else m.x
+		var a: int = f["a"]
+		if across > a * c and across < (a + MapNature.FORD_W) * c and along > (int(f["e0"]) - 1) * c and along < (int(f["e1"]) + 2) * c:
+			return true
+	return false
+
+
+## A ford: a gravel slope down each bank into the water, and a shallow pebbly strip across.
+func _fords() -> void:
+	var c := MapData.CELL
+	var wy := MapData.WATER_Y + 0.04
+	for f: Dictionary in d.fords:
+		var mid: Vector2 = ((f["p0"] as Vector2) + (f["p1"] as Vector2)) * 0.5
+		if not _in_chunk(mid):
+			continue
+		var ax: int = f["axis"]
+		var a: int = f["a"]
+		var m0 := (float(f["e0"]) + 0.5) * c
+		var m1 := (float(f["e1"]) + 0.5) * c
+		var run := minf(10.0, (m1 - m0) * 0.5 - 1.0)
+		var l0 := a * c
+		var l1 := (a + MapNature.FORD_W) * c
+		var P := func(along: float, across: float, y: float) -> Vector3:
+			return Vector3(along, y, across) if ax == 0 else Vector3(across, y, along)
+		var side := Vector3(0, 0, 1) if ax == 0 else Vector3(1, 0, 0)
+		# The gravel slopes run on under the water, so they come up out of it.
+		var fy := MapData.WATER_Y - 0.5
+		for e: Array in [[m0, m0 + run], [m1, m1 - run]]:
+			var top: float = e[0]
+			var foot: float = e[1]
+			# Two lanes: wheel ruts of darker gravel down the middle.
+			quad(P.call(top, l0, 0.0), P.call(top, l1, 0.0), P.call(foot, l1, fy), P.call(foot, l0, fy), C_FORD_BANK, Vector3.UP)
+			for lane: float in [0.38, 0.62]:
+				var u0 := l0 + (l1 - l0) * (lane - 0.05)
+				var u1 := l0 + (l1 - l0) * (lane + 0.05)
+				quad(P.call(top, u0, 0.03), P.call(top, u1, 0.03), P.call(foot, u1, fy + 0.03), P.call(foot, u0, fy + 0.03), C_FORD_BANK.darkened(0.1), Vector3.UP)
+			tri(P.call(top, l0, 0.0), P.call(foot, l0, fy), P.call(top, l0 - 0.01, MapData.LEVEL_Y[0]), C_RAMP_SIDE, -side)
+			tri(P.call(top, l1, 0.0), P.call(foot, l1, fy), P.call(top, l1 + 0.01, MapData.LEVEL_Y[0]), C_RAMP_SIDE, side)
+		quad(P.call(m0 + run, l0, wy), P.call(m0 + run, l1, wy), P.call(m1 - run, l1, wy), P.call(m1 - run, l0, wy), C_FORD, Vector3.UP)
+		# Stepping stones along the edges of the crossing.
+		var n := int((m1 - m0 - 2.0 * run) / 3.0)
+		for k in n:
+			for lat: float in [l0 + 0.8, l1 - 0.8]:
+				var along := m0 + run + (k + 0.5) * (m1 - m0 - 2.0 * run) / n
+				var kk := int(along * 13.0 + lat * 7.0)
+				_lump_main(P.call(along, lat + (_h01(kk) - 0.5) * 1.2, wy - 0.15), 0.35 + 0.3 * _h01(kk + 1), 0.35, kk, C_ROCK[kk % 3])
+
+
+## Streams sit in a shallow cut: dirt sides where a stream cell meets dry ground.
+func _stream_sides() -> void:
+	var c := MapData.CELL
+	for z in range(z0, z1):
+		for x in range(x0, x1):
+			var i := z * d.w + x
+			if (d.feat[i] & MapData.F_STREAM) == 0 or d.walk[i] != 1:
+				continue
+			for o: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+				var nx := x + o.x
+				var nz := z + o.y
+				if nx < 0 or nz < 0 or nx >= d.w or nz >= d.h:
+					continue
+				var k := nz * d.w + nx
+				if (d.feat[k] & MapData.F_STREAM) != 0 and d.walk[k] == 1:
+					continue
+				# The shared edge, from this cell's side.
+				var ex := (x + (1 if o.x > 0 else 0)) * c
+				var ez := (z + (1 if o.y > 0 else 0)) * c
+				var a: Vector3
+				var b: Vector3
+				if o.x != 0:
+					a = Vector3(ex, 0.0, z * c)
+					b = Vector3(ex, 0.0, (z + 1) * c)
+				else:
+					a = Vector3(x * c, 0.0, ez)
+					b = Vector3((x + 1) * c, 0.0, ez)
+				var dn := Vector3(0, STREAM_Y - 0.05, 0)
+				quad(a, b, b + dn, a + dn, C_STREAM_BANK, -Vector3(o.x, 0, o.y))
+
+
+## A lump in the main mesh (the detail mesh has its own, _lump).
+func _lump_main(p: Vector3, r: float, h: float, k: int, col: Color) -> void:
+	_lump(p, r, h, k, col)
 
 
 # ------------------------------------------------------------------------------------------------------ map edge
@@ -529,7 +712,7 @@ func _piece(pts: PackedVector2Array, cum: PackedFloat32Array, s: float, broken: 
 		quad(_v(pa + na * dw, 0.0), _v(pb + nb * dw, 0.0), _v(pb + nb * dw, -0.7), _v(pa + na * dw, -0.7), C_DECK, _v(na, 0.0))
 		quad(_v(pa - na * dw, 0.0), _v(pb - nb * dw, 0.0), _v(pb - nb * dw, -0.7), _v(pa - na * dw, -0.7), C_DECK, _v(-na, 0.0))
 		if seed_k % 8 == 0:
-			box(_v(mid, -3.0), Vector3(4.0, 2.3, 1.4), rot, C_STONE)
+			box(_v(mid, MapData.LEVEL_Y[0]), Vector3(4.0, -MapData.LEVEL_Y[0] - 0.7, 1.4), rot, C_STONE)
 	else:
 		# Ballast bed: a flat top and two sloping sides, joined to the next piece.
 		var bc := C_BALLAST_OLD if broken else C_BALLAST
@@ -650,6 +833,8 @@ const ROCK_P := 0.008             # per flat cell (light), more by cliffs and on
 const BUSH_P := 0.0035            # clumps per flat cell
 const C_ROCK := [Color(0.55, 0.53, 0.49), Color(0.50, 0.49, 0.46), Color(0.60, 0.57, 0.51)]
 const C_BUSH := [Color(0.27, 0.43, 0.17), Color(0.31, 0.47, 0.19), Color(0.24, 0.38, 0.16)]
+const C_REED := [Color(0.48, 0.55, 0.26), Color(0.56, 0.58, 0.30), Color(0.40, 0.50, 0.22)]
+const C_CANOPY := [Color(0.20, 0.36, 0.15), Color(0.24, 0.40, 0.17), Color(0.18, 0.32, 0.15)]
 
 
 func _details() -> void:
@@ -660,6 +845,21 @@ func _details() -> void:
 			if f == 0 or f == MapData.FLAT_NONE or d.busy[i] == 1:
 				continue
 			var k := (z * 7919 + x) * 31 + d.seed
+			var ft := d.feat[i]
+			# Map round 3: reeds in the marsh and along the streams, hedgerows; no rocks or bushes in fields,
+			# streams or marsh.
+			if (ft & MapData.F_HEDGE) != 0:
+				_hedge(x, z, MapData.level_y(f), k)
+			if (ft & MapData.F_MARSH) != 0:
+				if _h01(k + 500) < 0.45:
+					_reeds(Vector3((x + _h01(k + 501)) * MapData.CELL, 0.0, (z + _h01(k + 502)) * MapData.CELL), k)
+				continue
+			if (ft & MapData.F_STREAM) != 0:
+				if _h01(k + 510) < 0.3:
+					_reeds(Vector3((x + _h01(k + 511)) * MapData.CELL, STREAM_Y, (z + _h01(k + 512)) * MapData.CELL), k)
+				continue
+			if (ft & (MapData.F_FIELD | MapData.F_HEDGE)) != 0:
+				continue
 			var r := _h01(k)
 			var pr := ROCK_P * (1.6 if f >= 2 else 1.0)
 			if r < pr * 6.0 and _by_cliff(x, z):
@@ -681,6 +881,104 @@ func _details() -> void:
 					var o := Vector3((_h01(k + 60 + j) - 0.5) * 7.0, 0, (_h01(k + 70 + j) - 0.5) * 7.0)
 					var bs := 1.3 + 1.1 * _h01(k + 80 + j)
 					_lump(Vector3((x + 0.5) * MapData.CELL, y, (z + 0.5) * MapData.CELL) + o, bs, bs * 0.85, k + 90 + j, C_BUSH[(k + j) % 3])
+
+
+## A clump of reeds: thin tall blades, both sides (18 triangles).
+func _reeds(p: Vector3, k: int) -> void:
+	for b in 9:
+		var a := _h01(k + 600 + b) * TAU
+		var r := 0.5 * _h01(k + 620 + b)
+		var base := p + Vector3(cos(a) * r, 0.0, sin(a) * r)
+		var h := 1.1 + 0.9 * _h01(k + 640 + b)
+		var lean := Vector3(cos(a), 0, sin(a)) * 0.25
+		var side := Vector3(-sin(a), 0, cos(a)) * 0.05
+		var col: Color = C_REED[(k + b) % 3]
+		var tip := base + Vector3(0, h, 0) + lean
+		tri(base - side, base + side, tip, col, side.cross(Vector3.UP))
+		tri(base - side, base + side, tip, col, -side.cross(Vector3.UP))
+		if b % 3 == 0:
+			# A brown head on some.
+			var hc := base + Vector3(0, h * 0.8, 0) + lean * 0.8
+			_lump(hc - Vector3(0, 0.12, 0), 0.05, 0.25, k + 660 + b, Color(0.42, 0.28, 0.16))
+
+
+## Hedgerow bushes along a hedge cell, joined to the hedge cells beside it.
+func _hedge(x: int, z: int, y: float, k: int) -> void:
+	var c := MapData.CELL
+	var centre := Vector3((x + 0.5) * c, y, (z + 0.5) * c)
+	var dirs: Array[Vector3] = []
+	for o: Vector2i in [Vector2i(1, 0), Vector2i(0, 1)]:
+		if d.has(x + o.x, z + o.y, MapData.F_HEDGE):
+			dirs.append(Vector3(o.x, 0, o.y))
+	var n := 3
+	if dirs.is_empty():
+		for j in 2:
+			var bs := 1.2 + 0.6 * _h01(k + 700 + j)
+			_lump(centre + Vector3((_h01(k + 710 + j) - 0.5) * 3.0, 0, (_h01(k + 720 + j) - 0.5) * 3.0), bs, bs * 1.1, k + 730 + j, C_BUSH[(k + j) % 3])
+		return
+	for dv in dirs:
+		for j in n:
+			var t := (float(j) + 0.5) / float(n)
+			var p := centre + dv * c * t
+			var bs := 1.1 + 0.6 * _h01(k + 740 + j + int(dv.x) * 7)
+			_lump(p + Vector3((_h01(k + 750 + j) - 0.5) * 0.8, 0, (_h01(k + 760 + j) - 0.5) * 0.8), bs, bs * 1.2, k + 770 + j + int(dv.z) * 11, C_BUSH[(k + j) % 3])
+
+
+## Trees for this chunk: a list of transforms per tree mesh (TreeKit.KINDS), and a canopy mesh (left in the buffers)
+## that stands in for the woods from far away (lumps over each 4 x 4 cell group that is mostly wood).
+func _trees() -> Array:
+	var lists: Array = []
+	for i in TreeKit.KINDS:
+		lists.append([])
+	var c := MapData.CELL
+	for z in range(z0, z1):
+		for x in range(x0, x1):
+			var i := z * d.w + x
+			var ft := d.feat[i]
+			if (ft & (MapData.F_WOOD | MapData.F_TREE)) == 0:
+				continue
+			var f := d.walk[i]
+			if f == 0 or f == MapData.FLAT_NONE:
+				continue
+			var y := MapData.level_y(f)
+			var k := (z * 7919 + x) * 31 + d.seed * 3
+			var lone := (ft & MapData.F_WOOD) == 0
+			var n := 1
+			if not lone:
+				var nb := 0
+				for o: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+					if d.has(x + o.x, z + o.y, MapData.F_WOOD):
+						nb += 1
+				n = 2 if nb == 4 and _h01(k + 1) < 0.6 else 1
+			for j in n:
+				var kj := k + j * 101
+				var p := Vector3((x + 0.15 + 0.7 * _h01(kj + 2)) * c, y, (z + 0.15 + 0.7 * _h01(kj + 3)) * c)
+				var pine := _h01(kj + 4) < (0.6 if f >= 2 else 0.2)
+				var kind := TreeKit.pick(pine, _h01(kj + 5))
+				var s := (1.15 + 0.45 * _h01(kj + 6)) if lone else (0.8 + 0.5 * _h01(kj + 6))
+				var b := Basis(Vector3.UP, _h01(kj + 7) * TAU).scaled(Vector3(s, s * (0.9 + 0.25 * _h01(kj + 8)), s))
+				lists[kind].append(Transform3D(b, p))
+	# Far canopy: one lump per 6 x 6 cells (48 m) of wood.
+	var g := 6
+	for gz in range(z0, z1, g):
+		for gx in range(x0, x1, g):
+			var cnt := 0
+			var sum := Vector2.ZERO
+			var lvl := 1
+			for z in range(gz, mini(gz + g, z1)):
+				for x in range(gx, mini(gx + g, x1)):
+					var i := z * d.w + x
+					if (d.feat[i] & MapData.F_WOOD) != 0 and d.walk[i] != MapData.FLAT_NONE and d.walk[i] != 0:
+						cnt += 1
+						sum += Vector2(x + 0.5, z + 0.5)
+						lvl = d.walk[i]
+			if cnt < 11:
+				continue
+			var m := sum / cnt * c
+			var k := (gz * 7919 + gx) * 17 + d.seed
+			var r := 10.0 + 14.0 * cnt / 36.0
+			_lump(Vector3(m.x, MapData.level_y(lvl) + 2.0, m.y), r, 10.0 + 4.0 * _h01(k), k, C_CANOPY[k % 3])
+	return lists
 
 
 func _by_cliff(x: int, z: int) -> bool:

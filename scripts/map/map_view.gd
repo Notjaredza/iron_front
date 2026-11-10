@@ -14,6 +14,14 @@ var env: Environment
 var look := Look.DAY
 var chunks: Array[MeshInstance3D] = []
 var details: Array[MeshInstance3D] = []   # rocks and bushes per chunk, drawn near the camera only
+var woods: Array[Node3D] = []            # trees (near) and canopies (far) per chunk (map round 3)
+var tree_meshes: Array[Mesh] = []
+var tree_count := 0
+var canopy_tris := 0
+const TREE_RANGE := 700.0
+const TREE_SHADOW_H := 220.0
+var _tree_shadows := true
+var _trees_shown := true
 var scatter: GroundScatter               # grass tufts and flowers round the camera
 var cam: RtsCamera
 var detail_tris := 0
@@ -53,8 +61,15 @@ func _ready() -> void:
 func build(seed: int, w := 1000, h := 1500) -> void:
 	for c in chunks + details:
 		c.queue_free()
+	for c in woods:
+		c.queue_free()
 	chunks.clear()
 	details.clear()
+	woods.clear()
+	tree_count = 0
+	canopy_tris = 0
+	if tree_meshes.is_empty():
+		tree_meshes = TreeKit.meshes()
 	scatter.clear()
 	data = MapGen.generate(seed, w, h)
 	var t0 := Time.get_ticks_msec()
@@ -93,6 +108,7 @@ func build(seed: int, w := 1000, h := 1500) -> void:
 			add_child(di)
 			details.append(di)
 			detail_tris += int(r["detail_tris"])
+		_woods(r, i)
 	_results.clear()
 	scatter.data = data
 	_outside()
@@ -194,7 +210,62 @@ func follow(height: float) -> void:
 	if cam != null:
 		scatter.update(cam.target, height)
 	sun.shadow_enabled = height < 1500.0
+	# Tree shadows only from low down: from higher up they cost a lot and hardly show.
+	# From higher than the tree range no tree can show, so hide them all (hidden nodes skip the culling too).
+	var tv := height < TREE_RANGE
+	if tv != _trees_shown:
+		_trees_shown = tv
+		for w: Node3D in woods:
+			if w is MultiMeshInstance3D:
+				w.visible = tv
+	var ts := height < TREE_SHADOW_H
+	if ts != _tree_shadows:
+		_tree_shadows = ts
+		for w: GeometryInstance3D in woods:
+			if w is MultiMeshInstance3D:
+				w.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if ts else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	sun.directional_shadow_max_distance = clampf(height * 1.8, 150.0, 900.0)
 	# Thinner fog from high up, so the whole map stays clear; the fog look keeps more of it.
 	var keep := 0.35 if look == Look.FOG else 0.06
 	env.fog_density = _fog * clampf(900.0 / maxf(height, 1.0), keep, 1.0)
+
+
+## Trees near the camera (one MultiMesh per tree kind per chunk) and the canopy lumps that stand in for the woods
+## from far away.
+func _woods(r: Dictionary, i: int) -> void:
+	var lists: Array = r.get("trees", [])
+	for k in lists.size():
+		var l: Array = lists[k]
+		if l.is_empty():
+			continue
+		var mm := MultiMesh.new()
+		mm.transform_format = MultiMesh.TRANSFORM_3D
+		mm.mesh = tree_meshes[k]
+		mm.instance_count = l.size()
+		for q in l.size():
+			mm.set_instance_transform(q, l[q])
+		var mi := MultiMeshInstance3D.new()
+		mi.name = "trees_%d_%d" % [i, k]
+		mi.multimesh = mm
+		mi.material_override = mat
+		mi.visibility_range_end = TREE_RANGE
+		mi.visibility_range_end_margin = 60.0
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if _tree_shadows else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		mi.visible = _trees_shown
+		add_child(mi)
+		woods.append(mi)
+		tree_count += l.size()
+	var ca: Array = r.get("canopy", [])
+	if not ca.is_empty():
+		var cm := ArrayMesh.new()
+		cm.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, ca)
+		var ci := MeshInstance3D.new()
+		ci.name = "canopy_%d" % i
+		ci.mesh = cm
+		ci.material_override = mat
+		ci.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		ci.visibility_range_begin = TREE_RANGE - 40.0
+		ci.visibility_range_begin_margin = 60.0
+		add_child(ci)
+		woods.append(ci)
+		canopy_tris += int(r.get("canopy_tris", 0))
