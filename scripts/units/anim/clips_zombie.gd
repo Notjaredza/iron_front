@@ -325,7 +325,9 @@ static func brute_down(from: Dictionary, hits := 3) -> Dictionary:
 			B.THIGH_L: Vector3(70, 0, -8), B.SHIN_L: Vector3(-80, 0, 0), B.FOOT_L: Vector3(0, 0, 0),
 			B.SPINE: Vector3(-14, 0, 0), B.CHEST: Vector3(-8, 0, 0), B.NECK: Vector3(-16, 0, 0),
 			B.UARM_R: Vector3(10, 0, 18), B.FARM_R: Vector3(10, 0, 0), B.UARM_L: Vector3(40, 0, -8), B.FARM_L: Vector3(30, 0, 0)}})
-	var down: Dictionary = Rig.over(drop(kneel)["keys"][3][1], {"rifle": {"mode": "hand", "rot": Vector3(-80, 0, 0)}})
+	# The club let go: it lies on the ground beside the right hip, along the body (it must not prop the body up).
+	var down: Dictionary = Rig.over(drop(kneel)["keys"][3][1], {"rifle": {"mode": "bone", "bone": B.HIPS, "at": Vector3(0.42, 0.98, 0.02),
+		"rot": Vector3(90, 0, 0)}})
 	keys.append([t + 0.8, kneel, "in"])
 	keys.append([t + 1.6, kneel, "smooth"])
 	keys.append([t + 2.2, down, "in"])

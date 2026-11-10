@@ -216,5 +216,5 @@ Dead soldiers back on their feet, in our basic army style. They use the soldier 
   - deaths: a head shot, legs shot away then crawling, fire, and the brute.
 - **Rough edges:**
   - The jump down from the wall top is a quick tumble.
-  - The fallen brute lies slightly raised on its club.
+  - Fixed after the user's look: the fallen brute now lets go of its club and lies flat (it was propped up on it).
   - Hits are small dark sprays (no gore).
