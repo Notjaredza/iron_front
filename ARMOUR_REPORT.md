@@ -8,7 +8,7 @@ The user asked for melee troops on our side: "a ww1 heavy armored riot police ty
 - **Fighting:** both moves. A locked shield wall that advances step by step, with club men striking over the shields, then breaking into a rush near the enemy.
 - **Output:** pictures and videos.
 
-Go was given about 08:10 with an ETA of 3-4 h. It was built by 08:39.
+Go was given about 08:10 with an ETA of 3-4 h. It was built by 08:39 and APPROVED by the user at 08:41.
 
 ## What is built
 - **Two roles, on the rifleman's skeleton.** Every pose, clip, IK hand, death and blast throw works as for our other troops.

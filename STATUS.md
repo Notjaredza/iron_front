@@ -32,4 +32,4 @@
 ## Armoured melee troops (Building Chat 1), go 2026-11-10 ~08:10, ETA about 3-4 h (by ~11:10-12:10)
 - Our side: full heavy WW1 trench armour (plates, brow-plate visor helmet), tall slit shields, trench clubs / maces / spades, pistol back-up.
 - Moves: heavy walk, shield wall lock and step-push, strikes over the shields, break into the rush, swings, shield block and bash, pistol, hits, deaths, blast throws.
-- Output: move sheets, five short videos (wall, rush, strikes, pistol, battle vs red coats), battle stills. BUILT 2026-11-10 08:39, well under the ETA; waiting for the user's look. Files in results/units/armour/. Report: ARMOUR_REPORT.md.
+- Output: move sheets, five short videos (wall, rush, strikes, pistol, battle vs red coats), battle stills. BUILT 2026-11-10 08:39 (445a2e6), well under the ETA; APPROVED by the user 08:41. Files in results/units/armour/. Report: ARMOUR_REPORT.md.
