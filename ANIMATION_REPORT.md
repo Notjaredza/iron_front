@@ -269,3 +269,37 @@ searchlight for night; videos of the look and crew, flying and mooring, bombardi
   - **ship_bombard:** cruises at 115 m over an enemy battery; the turrets take turns, five shots each; three gun pits are hit, the guns thrown over, and they burn.
   - **ship_night:** dark; the searchlight sweeps the ground, finds the battery and holds on it; both turrets fire down the beam.
   - **ship_shotdown:** an enemy fighter makes a head-on pass, the top and window MGs fire; it comes round for a stern attack, the tail gunner fires; incendiary rounds start a fire that runs along the hull; she breaks her back and falls burning to the ground.
+
+## Flamethrowers (Question Chat, 2026-11-10)
+
+The user asked for flamethrowers next. Answers: all four kinds (a man-pack team, a heavy trench flamer, a flame
+tank, a flame wagon for the armoured trains); all the fire effects (burning ground, men catching fire, things
+burning, the operator's tanks bursting); the look of the explosions they called "stunning"; two videos (clearing a
+trench, and against zombies at a wall).
+
+- `scripts/flame/flame_fx.gd` (class FlameFx) holds all the fire in a scene. It is worked out on the CPU each frame and drawn as two MultiMeshes of the faceted explosion blob (FxMesh.blob, only reused):
+  - **jet:** `add_jet(fn)`. A stream of burning fuel blobs that arcs under gravity, rolls off into billows along the way, and drips. A pilot flame shows at the nozzle when not firing.
+  - **burning ground:** fuel that lands makes a patch. It burns hard, dies down, smoulders with thin smoke, and leaves a ragged black scorch that stays. Fuel also sticks to walls, sandbags and other boxes (`solids`): it burns on their tops and faces.
+  - **burners:** `add_burner(fn, t0, t1)` puts flames on any set of points, such as a man's bones, roofs or wrecks.
+  - **fireball:** `fireball(at, scale)` is a bursting fuel tank: a hot ball, burning fuel thrown all round, and a tower of smoke.
+  - **light:** eight fire lights move each frame to the brightest fires (the jets, big patches, burning men, flashes), so the fire lights the ground and the men. The three brightest cast shadows.
+- `scripts/flame/flame_fire.gdshader` makes the billows: unshaded HDR heat colours, every face its own heat, cooling from white-hot through yellow and orange to dark red and soot, like fx_fire.
+- `scripts/flame/flame_smoke.gdshader` makes the black oily smoke: lit and faceted, with the undersides glowing orange near the fire. Old smoke shrinks away rather than fading.
+- `scripts/flame/flamer_kit.gd` (class FlamerKit) builds the kit in the train/gun style:
+  - **man-pack:** two fuel bottles and a pressure ball on a frame worn on the back, a lance with a pistol grip, front grip, igniter and nozzle, and a hose. The assistant carries a spare bottle and his rifle.
+  - **heavy trench flamer:** four loads for a crew of four: the fuel cylinder on carrying poles, the three-legged stand, the long projector with spade handles and a small shield, and the hand pump.
+  - **flame tank:** the approved light tank, with its gun swapped for a flame projector and two armoured fuel drums on the rear deck.
+  - **flame wagon:** a TrainCar built like the gun flat. It carries two big banded fuel tanks, a pump house, and a round turret with a ball-mounted projector that swings right round, and it has its own far look.
+- `tools/flame_clips.gd` (extends zombie_clips) makes the two videos in results/units/anim/. It also has `test` and `kit` scenes, used only for checking. A figure catches fire when the fire actually reaches it (a billow or the jet at its body, a burning patch under it, or a burning figure pressed against it). Burning figures char black, with no gore.
+  - **flame_trench (31 s):**
+    1. The flame tank rolls up on the left while the man-pack team runs in on the right, and the red jackets fire a volley.
+    2. The tank sweeps the left of the trench and the operator the right; defenders fall, fall back, or run burning along the fire step.
+    3. A red jacket hits the operator and his tanks burst in a fireball. He burns and falls, and his assistant is thrown flat, crawls clear and fires again.
+    4. The tank turns and burns out the rest.
+    5. A high shot of the burning, smoking trench.
+  - **flame_wall (37 s, dusk):**
+    1. The horde comes at our wall.
+    2. The heavy trench flamer (crew of four, pump working) sweeps the field, and the two man-pack flamers burn in front of the wall.
+    3. Climbers at the west end are burnt as they come over the top and fall inside.
+    4. The engine pushes the flame wagon out through the rail gate. Its turret burns the zombies at the gate, then the field as it rolls out.
+    5. A crane shot of the burning field. 26 of the 34 zombies catch fire.
