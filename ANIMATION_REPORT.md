@@ -270,7 +270,7 @@ searchlight for night; videos of the look and crew, flying and mooring, bombardi
   - **ship_night:** dark; the searchlight sweeps the ground, finds the battery and holds on it; both turrets fire down the beam.
   - **ship_shotdown:** an enemy fighter makes a head-on pass, the top and window MGs fire; it comes round for a stern attack, the tail gunner fires; incendiary rounds start a fire that runs along the hull; she breaks her back and falls burning to the ground.
 
-## Flamethrowers (Question Chat, 2026-11-10)
+## Flamethrowers (Question Chat, 2026-11-10) — APPROVED 17:48
 
 The user asked for flamethrowers next. Answers: all four kinds (a man-pack team, a heavy trench flamer, a flame
 tank, a flame wagon for the armoured trains); all the fire effects (burning ground, men catching fire, things
