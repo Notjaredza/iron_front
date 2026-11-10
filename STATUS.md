@@ -43,4 +43,4 @@
 - Foot core (men-at-arms, spearmen, crossbow + pavise, longbow, captain, banner), heavy shock troops (two-hander, pole-axe/halberd), rabble levy, knights on barded horses + light horse scout.
 - Bright heraldry: per-man tinctures, divisions and charges; several lords' banners.
 - Moves, formations (shield wall, spear hedge, archer stakes), knight charge, fights vs our troops. Pictures and videos.
-- BUILT 2026-11-10 18:37 (about 30 min). Pictures in results/units/medieval/ (med_look, med_close, med_moves_foot/missile/heavy/falls, med_formations, med_knights, med_fights). Videos: med_host, med_volley, med_charge, med_melee, med_battle (.mp4). Report: MEDIEVAL_REPORT.md. Waits for the user's look.
+- BUILT 2026-11-10 18:37 (about 30 min). Pictures in results/units/medieval/ (med_look, med_close, med_moves_foot/missile/heavy/falls, med_formations, med_knights, med_fights). Videos: med_host, med_volley, med_charge, med_melee, med_battle (.mp4). Report: MEDIEVAL_REPORT.md. APPROVED by the user 18:43.

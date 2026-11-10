@@ -10,7 +10,7 @@ The user asked "ancient hosts - lets work on the medieval enemy next". These wer
 - **Moves:** core moves, formations, the knight charge, and fights against our riflemen and armoured troops.
 - **Output:** pictures and videos.
 
-Go was given at 18:10, with an ETA of 3-4 h. It was built by 18:37 (about 30 min).
+Go was given at 18:10, with an ETA of 3-4 h. It was built by 18:37 (about 30 min). APPROVED by the user at 18:43.
 
 ## What is built
 - **The men** (`Medieval`, built by `MedievalBuilder`) are on the rifleman's skeleton, so every pose, clip, IK hand, death and blast throw works.
