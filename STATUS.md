@@ -38,3 +38,9 @@
 - A section of 4 (NCO with the plan, 3 sappers, rifles slung). Kit: pick + shovel, mallet + stakes, saw + hammer + planks, wire cutters + coil.
 - Jobs: dig a trench, build a plank wall, barbed wire, strip a wreck, track repair. The work grows as they work. Pictures only (look + move sheets).
 - BUILT 2026-11-10 17:24 (about 20 min). Sheets in results/units/engineers/ (look, moves, dig, build, wire, wreck, track). Report: ENGINEERS_REPORT.md. APPROVED by the user 17:31.
+
+## Medieval host: the ancient enemy (Building Chat 1), go 2026-11-10 18:10, ETA about 3-4 h (by ~21:10-22:10)
+- Foot core (men-at-arms, spearmen, crossbow + pavise, longbow, captain, banner), heavy shock troops (two-hander, pole-axe/halberd), rabble levy, knights on barded horses + light horse scout.
+- Bright heraldry: per-man tinctures, divisions and charges; several lords' banners.
+- Moves, formations (shield wall, spear hedge, archer stakes), knight charge, fights vs our troops. Pictures and videos.
+- BUILT 2026-11-10 18:37 (about 30 min). Pictures in results/units/medieval/ (med_look, med_close, med_moves_foot/missile/heavy/falls, med_formations, med_knights, med_fights). Videos: med_host, med_volley, med_charge, med_melee, med_battle (.mp4). Report: MEDIEVAL_REPORT.md. Waits for the user's look.
