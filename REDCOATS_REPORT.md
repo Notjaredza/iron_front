@@ -139,3 +139,26 @@ The horse and the gun have one mesh each so far; neither has a mid or far mesh y
 - The horse's hooves can slide a little in the gaits; the gaits are worked out by phase, not with foot IK.
 - There is no thrown-grenade flight or burst yet (the clip only marks the "throw" moment).
 - No sounds yet.
+
+# Fights: red coats against our troops (Building Chat 1, 2026-11-10)
+
+The user asked for the two sides fighting each other: the charge clash, melee, storming a trench, and the dragoons riding in. Pictures only, mixed outcomes (each side wins some), in the blasts' style (hard hits and falls, smoke and flashes, no blood). Go given ~07:55; built 08:05.
+
+## What each sheet shows (results/units/redcoats/)
+- **fight_clash.png** (8 frames, side view): the red coats come on with the bayonet while ours fire. Some red coats fall to the fire, then the lines meet. Thrusts, parries and butt strokes follow, and men fall on both sides.
+- **fight_duel_a.png**: parry and riposte, then the red coat's second thrust lands. **The red coat wins.**
+- **fight_duel_b.png**: ours parries the thrust, winds up and lands a butt stroke. **Ours wins.**
+- **fight_duel_c.png**: locked rifles. Ours is shoved down, then a comrade shoots the red coat from the side, and ours gets up wounded. **Ours wins, just.**
+- **fight_trench.png**: the red coats march up into our fire, give a volley while ours duck, and charge. Some fall on the parapet; the rest leap down. The fight inside is shown with our side of the trench cut away. **Mixed: the red coats take part of the trench.**
+- **fight_dragoons.png**: the dragoons gallop in, and one horse is brought down by our fire. At the cut, one of ours ducks, one dives and one is struck. They ride through, ours turn and fire, and a second horse goes down. They wheel to come again. Finally an unhorsed dragoon, sabre raised, faces one of our rifles. **Mixed.**
+
+## Files
+- scripts/units/anim/clips_fight.gd: the shared hand-to-hand poses: guard, lunge, parry, butt wind and strike, locked (push), duck, leap, reel, wounded, aim. Each works with either weapon; the left hand goes to the musket's or the rifle's fore-end.
+- tools/fight_pictures.gd: builds the four scenes and renders the sheets (`-- clash duels trench dragoons`).
+
+## Rough edges, for later
+- These are posed stills, not timed clips. No videos yet, and nothing in the test field.
+- Our rifles have no bayonet fitted, so in melee ours use parries and butt strokes.
+- In the trench sheet, the frames inside the trench hide our rear wall (a cutaway). The in-game camera will need its own answer for this.
+- In the dragoons' last frames the field is wide and the riders sit small in the frame.
+- No sounds.
