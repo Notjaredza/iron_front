@@ -33,3 +33,8 @@
 - Our side: full heavy WW1 trench armour (plates, brow-plate visor helmet), tall slit shields, trench clubs / maces / spades, pistol back-up.
 - Moves: heavy walk, shield wall lock and step-push, strikes over the shields, break into the rush, swings, shield block and bash, pistol, hits, deaths, blast throws.
 - Output: move sheets, five short videos (wall, rush, strikes, pistol, battle vs red coats), battle stills. BUILT 2026-11-10 08:39 (445a2e6), well under the ETA; APPROVED by the user 08:41. Files in results/units/armour/. Report: ARMOUR_REPORT.md.
+
+## Engineers: workers and crew (Building Chat 1), go 2026-11-10 17:04, ETA about 1.5-2.5 h (by ~18:35-19:35)
+- A section of 4 (NCO with the plan, 3 sappers, rifles slung). Kit: pick + shovel, mallet + stakes, saw + hammer + planks, wire cutters + coil.
+- Jobs: dig a trench, build a plank wall, barbed wire, strip a wreck, track repair. The work grows as they work. Pictures only (look + move sheets).
+- BUILT 2026-11-10 17:24 (about 20 min). Sheets in results/units/engineers/ (look, moves, dig, build, wire, wreck, track). Report: ENGINEERS_REPORT.md. Waits for the user's look.
