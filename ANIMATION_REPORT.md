@@ -218,3 +218,33 @@ Dead soldiers back on their feet, in our basic army style. They use the soldier 
   - The jump down from the wall top is a quick tumble.
   - Fixed after the user's look: the fallen brute now lets go of its club and lies flat (it was propped up on it).
   - Hits are small dark sprays (no gore).
+
+## Track-laying train (Question Chat, 2026-11-10)
+
+The user asked for a train that builds our track. Answers: a crane lays ready-made panels; the train is an engine
+pushing, panel flats and a crane car at the front plus a crew coach; built all in one go.
+
+- `scripts/trains/layer_car.gd` (class LayerCar, extends TrainCar; the train chat's files are only reused):
+  - **crane car:** 14.4 m, a 33.5 m lattice boom on two portal towers with a king post and stays, a trolley, a spreader beam on four ropes, the winch house with a chimney, and rope drums;
+  - **panel flat:** 12.6 m, six 10 m panels stacked on battens, hidden one by one with `set_stack`;
+  - **crew coach:** windows, end platforms, a stove pipe, a tool rack;
+  - **shared parts:**
+    - `panel_geo()` (14 sleepers, rails, fishplates);
+    - `panel_xf(path, d0)` (a laid panel is a straight chord);
+    - `bed(path, d0, d1)` (a graded earth strip, pegs every 10 m, a red flag at the end of the planned route);
+  - **wreck:** charred, and the boom's front half folds down about the front tower (`set_tip`).
+  - **Triangles, close / far:** crane car 7016 / 160, flat 7552 / 32, coach 2544 / 48.
+- `tools/layer_clips.gd` (extends siege_clips): four videos in results/units/anim/.
+  - **One laying cycle (16 s):**
+    1. The panel is picked off the first flat, carried out along the boom and lowered onto the bed.
+    2. Two guides steady it onto the rail ends.
+    3. Two joint men kneel and bolt the fishplates with spanners.
+    4. The foreman waves the train on, and it creeps 10 m onto the new panel.
+  - **The videos:**
+    - **layer_look:** the train, each car, the far look, the wreck.
+    - **layer_straight:** three panels; wide shot, close at the joint, high shot.
+    - **layer_curve:** three panels on a 110 m bend; the spreader swings each panel to line up with the curve.
+    - **layer_shelled:**
+      1. A near miss stops the work, and the gang drop flat.
+      2. A direct hit on the crane car snaps the boom, which folds down; the hanging panel drops.
+      3. The foreman is knocked over and the winch house burns.
