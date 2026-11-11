@@ -28,20 +28,21 @@ const Anim := preload("res://scripts/units/anim/anim.gd")
 ## reload_every: shots before the reload clip. melee: chance a blow kills. hp: hits to kill a man.
 ## reach: how far (metres) a man goes for an enemy in hand to hand. pin: what happens when pinned ("" never).
 ## wait: extra seconds [least, most] a man takes between shots (aiming, picking a man): WW1 aimed rifle fire is a
-## round every 4-6 s, not as fast as the bolt can be worked.
+## round every 4-6 s, not as fast as the bolt can be worked. ammo: rounds a man carries (0: no gun); ours fill up
+## again near a finished depot or HQ, the enemy's do not. wound: chance a man who would have died is only wounded.
 const SPEC := {
 	"rifles": {"range": 150.0, "acc": 0.14, "wait": [2.0, 4.0], "reload_every": 5, "melee": 0.35, "hp": 1, "reach": 8.0, "pin": "prone",
-		"supp": 0.07, "side": 0},
+		"supp": 0.07, "side": 0, "ammo": 50, "wound": 0.35},
 	"engineers": {"range": 0.0, "acc": 0.0, "wait": [0.0, 0.0], "reload_every": 1, "melee": 0.2, "hp": 1, "reach": 6.0, "pin": "kneel",
-		"supp": 0.0, "side": 0},
-	"redcoats": {"range": 90.0, "acc": 0.16, "wait": [0.1, 0.6], "reload_every": 1, "melee": 0.3, "hp": 1, "reach": 10.0, "pin": "kneel",
-		"supp": 0.09, "side": 1},
+		"supp": 0.0, "side": 0, "ammo": 0, "wound": 0.35},
+	"redcoats": {"range": 90.0, "acc": 0.3, "wait": [0.1, 0.6], "reload_every": 1, "melee": 0.3, "hp": 1, "reach": 10.0, "pin": "kneel",
+		"supp": 0.09, "side": 1, "ammo": 24, "wound": 0.0},
 	"medieval": {"range": 0.0, "acc": 0.0, "wait": [0.0, 0.0], "reload_every": 1, "melee": 0.4, "hp": 1, "reach": 14.0, "pin": "",
-		"supp": 0.0, "side": 1},
+		"supp": 0.0, "side": 1, "ammo": 0, "wound": 0.0},
 	"archers": {"range": 120.0, "acc": 0.1, "wait": [0.8, 2.0], "reload_every": 1, "melee": 0.15, "hp": 1, "reach": 5.0, "pin": "",
-		"supp": 0.06, "side": 1},
+		"supp": 0.06, "side": 1, "ammo": 24, "wound": 0.0},
 	"zombies": {"range": 0.0, "acc": 0.0, "wait": [0.0, 0.0], "reload_every": 1, "melee": 0.3, "hp": 2, "reach": 14.0, "pin": "",
-		"supp": 0.0, "side": 1},
+		"supp": 0.0, "side": 1, "ammo": 0, "wound": 0.0},
 }
 
 static var _libs := {}                         # kind -> AnimationLibrary
