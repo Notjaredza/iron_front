@@ -2,6 +2,7 @@ extends Node3D
 ## Iron Front: the map test scene (step 1). It builds a map from a seed and lets you fly over it.
 ## Keys: WASD move, wheel zoom, Q/E turn (or hold the middle mouse button), T day/night/fog, N a new map.
 ## Squads (step 2, round 1): three rifle squads start near the middle; select them and right-click to move.
+## Building round: two engineer sections start behind them; B opens the build menu (see BuildControl).
 ## Command-line options after `--`: --seed=N, and --size=WxH in cells (for small test maps).
 
 var view: MapView
@@ -14,6 +15,7 @@ var ready_map := false                 # tools wait for this
 var blasts: MapBlasts                  # explosions round B: blasts and craters on the map (F, G, V, 1-9)
 var nav: NavGrid                       # squads round 1: where troops can walk
 var squads: SquadControl
+var build: BuildControl                # building round: the build menu, placing and the engineers' work
 
 
 func _ready() -> void:
@@ -37,6 +39,12 @@ func _ready() -> void:
 	squads = SquadControl.new()
 	add_child(squads)
 	squads.cam = cam
+	build = BuildControl.new()
+	add_child(build)                   # after the squads, so it sees the mouse first while placing
+	build.cam = cam
+	build.view = view
+	build.squads = squads
+	squads.build = build
 	var layer := CanvasLayer.new()
 	add_child(layer)
 	hud = Label.new()
@@ -60,6 +68,7 @@ func new_map(s: int) -> void:
 	var sz := view.data.size_m()
 	cam.target = Vector3(sz.x * 0.5, 0, sz.y * 0.5)
 	nav = NavGrid.new().build(view.data)
+	build.reset(nav, view.data)
 	squads.spawn(nav, Vector2(sz.x * 0.5, sz.y * 0.5))
 	var first := squads.squads[0].at
 	cam.target = Vector3(first.x, 0, first.y)
@@ -89,5 +98,5 @@ func _process(_delta: float) -> void:
 	if not ready_map:
 		return
 	view.follow(cam.height)
-	hud.text = "Iron Front map test   seed %d   %s   %d FPS   height %d m\nWASD move, wheel zoom, Q/E turn, T day/night/fog, N new map\n%s\n%s" % [
-		seed, view.look_name(), Engine.get_frames_per_second(), int(cam.height), blasts.help(), squads.help()]
+	hud.text = "Iron Front map test   seed %d   %s   %d FPS   height %d m\nWASD move, wheel zoom, Q/E turn, T day/night/fog, N new map\n%s\n%s\n%s" % [
+		seed, view.look_name(), Engine.get_frames_per_second(), int(cam.height), blasts.help(), squads.help(), build.help()]
