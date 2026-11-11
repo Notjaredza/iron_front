@@ -4,6 +4,10 @@ extends Node3D
 ## - Left click on a squad selects it; Shift adds it to the selection. A click on empty ground clears it.
 ## - Left drag draws a box and selects every squad with a man inside it.
 ## - Right click sends the selected squads there, spread side by side; a double right click sends them at a run.
+## - Right drag draws the line the selected squads will stand on (Total War style): one solid line of men,
+##   squads side by side in their current left-to-right order, facing forward from the line (drawn left to right
+##   on screen they face away from the camera; drawn the other way they face it). A long line makes a wide, shallow
+##   formation; a short one a narrow, deep one. A preview of every man's place shows while dragging. Always a walk.
 ## - H brings the camera to the selected squads (or the first squad).
 ## Orders are instant for now: the comms network (step 3) will delay them later.
 
@@ -11,6 +15,7 @@ const PICK_PX := 22.0
 const DRAG_PX := 6.0
 const SPREAD := 24.0                           # metres between squads sent together
 const DOUBLE_S := 0.35
+const LINE_PX := 12.0                          # a right drag shorter than this (pixels) is a plain click
 
 var nav: NavGrid
 var cam: RtsCamera
@@ -22,6 +27,12 @@ var _down := false
 var _last_right := -10.0
 var _last_target := Vector2.ZERO
 var _note_t := 0.0
+var _rpress := Vector2.ZERO                    # right button: where it went down (screen) ...
+var _rdown := false
+var _rstart: Variant = null                    # ... and on the ground (Vector2 or null)
+var _rdrag := false
+var _preview: MeshInstance3D
+var _pimm: ImmediateMesh
 
 
 func _ready() -> void:
@@ -36,6 +47,12 @@ func _ready() -> void:
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.visible = false
 	layer.add_child(box)
+	_pimm = ImmediateMesh.new()
+	_preview = MeshInstance3D.new()
+	_preview.mesh = _pimm
+	_preview.material_override = Squad._flat(Color(0.55, 1.0, 0.55, 0.9))
+	_preview.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(_preview)
 
 
 ## Clears the old squads and puts new ones round a point (metres), facing north.
@@ -76,17 +93,29 @@ func _unhandled_input(event: InputEvent) -> void:
 					_select_box(Rect2(_press, Vector2.ZERO).expand(mb.position), mb.shift_pressed)
 				else:
 					_select_click(mb.position, mb.shift_pressed)
-		elif mb.button_index == MOUSE_BUTTON_RIGHT and mb.pressed:
-			var now := Time.get_ticks_msec() / 1000.0
-			var run := now - _last_right < DOUBLE_S
-			_last_right = now
-			var p: Variant = ground_at(mb.position)
-			if p != null:
-				var g := Vector2((p as Vector3).x, (p as Vector3).z)
-				if run:
-					g = _last_target                      # the double click runs to the first click's spot
-				_last_target = g
-				_order(g, run)
+		elif mb.button_index == MOUSE_BUTTON_RIGHT:
+			if mb.pressed:
+				_rdown = true
+				_rdrag = false
+				_rpress = mb.position
+				_rstart = _ground2(mb.position)
+			elif _rdown:
+				_rdown = false
+				_pimm.clear_surfaces()
+				var end: Variant = _ground2(mb.position)
+				if _rdrag and _rstart != null and end != null:
+					_order_line(_rstart, end)
+					_last_right = -10.0                   # a drag never starts a double click
+				else:
+					_right_click(mb.position)
+	elif event is InputEventMouseMotion and _rdown:
+		var mm := event as InputEventMouseMotion
+		if not _rdrag and _rpress.distance_to(mm.position) > LINE_PX and not selected().is_empty():
+			_rdrag = true
+		if _rdrag and _rstart != null:
+			var end: Variant = _ground2(mm.position)
+			if end != null:
+				_draw_preview(plan_line(selected(), _rstart, end))
 	elif event is InputEventMouseMotion and _down:
 		var mm := event as InputEventMouseMotion
 		if _press.distance_to(mm.position) > DRAG_PX:
@@ -141,6 +170,87 @@ func _select_box(r: Rect2, add: bool) -> void:
 			s.selected = false
 
 
+## A right click (no drag): move there; a second click soon after runs to the first click's spot.
+func _right_click(at: Vector2) -> void:
+	var now := Time.get_ticks_msec() / 1000.0
+	var run := now - _last_right < DOUBLE_S
+	_last_right = now
+	var p: Variant = _ground2(at)
+	if p == null:
+		return
+	var g: Vector2 = p
+	if run:
+		g = _last_target
+	_last_target = g
+	_order(g, run)
+
+
+func _ground2(mp: Vector2) -> Variant:
+	var p: Variant = ground_at(mp)
+	return null if p == null else Vector2((p as Vector3).x, (p as Vector3).z)
+
+
+## Plans a drawn line from a to b (metres) for the given squads: one solid line of men. Returns one
+## {"squad", "at", "face", "width"} per squad, left to right. Shared by the preview, the order and the check.
+static func plan_line(sel: Array[Squad], a: Vector2, b: Vector2) -> Array:
+	var out := []
+	var n := sel.size()
+	if n == 0:
+		return out
+	var dir := (b - a).normalized() if a.distance_to(b) > 0.01 else Vector2(1, 0)
+	var face := Vector2(dir.y, -dir.x)            # the line runs to the squad's right hand
+	# How many men wide the whole line is, shared out evenly between the squads.
+	var cols := int(round(a.distance_to(b) / Squad.LINE_GAP)) + 1
+	var width := clampi(int(round(float(cols) / n)), Squad.MIN_FILES, Squad.MEN)
+	var span := width * Squad.LINE_GAP          # each squad's share of the line, so the gaps match the men's
+	var mid := (a + b) * 0.5
+	var order := sel.duplicate()
+	order.sort_custom(func(p: Squad, q: Squad) -> bool: return p.at.dot(dir) < q.at.dot(dir))
+	for i in n:
+		var c := mid + dir * (float(i) - (n - 1) * 0.5) * span
+		out.append({"squad": order[i], "at": c + face * 1.0, "face": face, "width": width})
+	return out
+
+
+## Sends the selected squads onto a drawn line (always at a walk).
+func _order_line(a: Vector2, b: Vector2) -> void:
+	var failed := 0
+	for p: Dictionary in plan_line(selected(), a, b):
+		var s: Squad = p["squad"]
+		var to: Vector2 = p["at"]
+		if not s.order_move(to, false, p["face"], p["width"]) and not s.order_move(nav.nearest_open(to), false, p["face"], p["width"]):
+			failed += 1
+	if failed > 0:
+		say("No way there on foot")
+
+
+## Every man's place on the drawn line: a short tick pointing the way he will face, and an arrow per squad.
+func _draw_preview(plan: Array) -> void:
+	_pimm.clear_surfaces()
+	if plan.is_empty():
+		return
+	_pimm.surface_begin(Mesh.PRIMITIVE_LINES)
+	for p: Dictionary in plan:
+		var at: Vector2 = p["at"]
+		var f: Vector2 = p["face"]
+		var right := Vector2(-f.y, f.x)
+		for i in Squad.MEN:
+			var o := Squad.free_offset(i, p["width"])
+			var q := at + right * o.x - f * o.y
+			_seg(q - right * 0.4, q + right * 0.4)
+			_seg(q, q + f * 0.7)
+		var tip := at + f * 3.0
+		_seg(at, tip)
+		_seg(tip, tip - f * 1.2 + right * 0.8)
+		_seg(tip, tip - f * 1.2 - right * 0.8)
+	_pimm.surface_end()
+
+
+func _seg(p: Vector2, q: Vector2) -> void:
+	_pimm.surface_add_vertex(Vector3(p.x, nav.height(p) + 0.3, p.y))
+	_pimm.surface_add_vertex(Vector3(q.x, nav.height(q) + 0.3, q.y))
+
+
 ## Sends the selected squads to g, side by side across the way they are going.
 func _order(g: Vector2, run: bool) -> void:
 	var sel := selected()
@@ -157,7 +267,7 @@ func _order(g: Vector2, run: bool) -> void:
 	var failed := 0
 	for i in sel.size():
 		var to := g + side * (float(i) - (sel.size() - 1) * 0.5) * SPREAD
-		if not sel[i].order_move(to, run) and not sel[i].order_move(g, run):
+		if not sel[i].order_move(to, run, fwd) and not sel[i].order_move(g, run, fwd):
 			failed += 1
 	if failed > 0:
 		say("No way there on foot")
@@ -176,7 +286,7 @@ func _process(delta: float) -> void:
 
 func help() -> String:
 	var n := selected().size()
-	return "Left click/drag select squads (Shift adds), right click move, double right click run, H go to squads   [%d selected]%s" % [
+	return "Left click/drag select squads (Shift adds), right click move, double right click run, right drag draw a line, H go to squads   [%d selected]%s" % [
 		n, ("   " + note) if not note.is_empty() else ""]
 
 

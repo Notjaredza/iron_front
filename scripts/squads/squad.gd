@@ -3,7 +3,8 @@ extends Node3D
 ## Iron Front: a 12-man rifle squad on the map (squads round 1: select and move; no fighting yet).
 ## - The squad has one route. Its lead point walks the route, and drops a trail of breadcrumbs behind it.
 ## - On the move the men walk two abreast in a column down the trail, so they follow it round cliffs and up ramps.
-## - When the squad stops they spread into two ranks of six facing the way it was going.
+## - When the squad stops they form ranks `files` men wide (two ranks of six unless a drawn line says otherwise),
+##   facing the way the order said (or the way they were going).
 ## - Each man plays the shared walk, run or ready clip (baked once from the animation library).
 
 const R := preload("res://scripts/units/anim/clips_rifle.gd")
@@ -17,6 +18,7 @@ const COL_SIDE := 0.9                          # half the gap between the two fi
 const LINE_GAP := 2.2                          # metres between men in a halted rank
 const LINE_DEPTH := 2.5
 const CRUMB := 0.5                             # trail spacing (m)
+const MIN_FILES := 3                           # narrowest line: 3 men wide, 4 ranks deep
 
 static var _lib: AnimationLibrary
 
@@ -27,6 +29,8 @@ var players: Array[AnimationPlayer] = []
 var rings: Array[MeshInstance3D] = []
 var at := Vector2.ZERO                         # the lead point (metres, x/z)
 var heading := Vector2(0, -1)                  # the way the squad faces
+var files := 6                                 # men in each rank when halted
+var face_goal := Vector2.ZERO                  # the way to face on arrival (zero: the way they were going)
 var path := PackedVector2Array()
 var running := false
 var selected := false
@@ -117,10 +121,17 @@ static func _yaw(dir: Vector2) -> float:
 
 
 ## Sends the squad to a point (metres). Returns false if it cannot get there.
-func order_move(to: Vector2, run := false) -> bool:
+## face: the way to face on arrival (zero keeps the way they were going). width: men per rank (0 keeps it).
+func order_move(to: Vector2, run := false, face := Vector2.ZERO, width := 0) -> bool:
 	var p := nav.find_path(at, to)
 	if p.is_empty():
 		return false
+	face_goal = face.normalized() if face.length() > 0.001 else Vector2.ZERO
+	if width > 0:
+		files = clampi(width, MIN_FILES, MEN)
+	if at.distance_to(to) < 0.3:
+		_arrive()                                  # already there: just turn and re-form
+		return true
 	if path.is_empty():
 		trail.clear()                              # setting off from a halt: fall in behind the new route
 		trail.push_front(at)
@@ -161,11 +172,35 @@ func _step(delta: float) -> void:
 		left -= s
 		if d <= s + 0.001:
 			path.remove_at(0)
+			if path.is_empty():
+				_arrive()
 		if trail.is_empty() or trail[0].distance_to(at) >= CRUMB:
 			trail.push_front(at)
 	var keep := int((MEN / 2 + 2) * COL_GAP / CRUMB) + 4
 	if trail.size() > keep:
 		trail.resize(keep)
+
+
+func _arrive() -> void:
+	path.clear()
+	if face_goal != Vector2.ZERO:
+		heading = face_goal
+
+
+## Halted ranks for a squad `width` men wide: [ranks, men in the last rank].
+static func ranks_for(width: int) -> Vector2i:
+	var r := ceili(float(MEN) / width)
+	return Vector2i(r, MEN - (r - 1) * width)
+
+
+## Where man i stands when halted, relative to the lead point: x across (right +), y back (+). Static so the
+## drag preview can draw the same places before the order is given.
+static func free_offset(i: int, width: int) -> Vector2:
+	var rf := ranks_for(width)
+	var rank := i / width
+	var file := i % width
+	var in_rank := width if rank < rf.x - 1 else rf.y   # the last rank may be short: keep it centred
+	return Vector2((float(file) - (in_rank - 1) * 0.5) * LINE_GAP, float(rank) * LINE_DEPTH + 1.0)
 
 
 func _slow(p: Vector2) -> float:
@@ -194,10 +229,9 @@ func _slot(i: int) -> Vector2:
 
 
 func _slot_free(i: int) -> Vector2:
-	var rank := i / 6
-	var file := i % 6
+	var o := free_offset(i, files)
 	var right := Vector2(-heading.y, heading.x)
-	var q := at + right * (float(file) - 2.5) * LINE_GAP - heading * (float(rank) * LINE_DEPTH + 1.0)
+	var q := at + right * o.x - heading * o.y
 	return q if _same_ground(q, at) else at - heading * float(i) * 0.6
 
 
