@@ -25,6 +25,14 @@ extends Node3D
 ##   new map.
 ## - O shows the comms map: the officer's 150 m reach, the wires (cut ones red), each runner's way and each
 ##   order travelling the wire as a pulse.
+## Recruitment round:
+## - Linemen (recruited at the HQ) lay the wire: a wire drawn with the Telegraph wire tool is planned, and the
+##   nearest free linemen walk to its first end and then out along it to the other, the poles going up behind
+##   them (only where they walk near its line: a long way round leaves a gap until they are back on it); it works
+##   once they get there. Free linemen also walk out to mend cuts.
+## - The officer's powers (his unit card's buttons, or Z and U):
+##     Rally            squads within 150 m stop being pinned and shake off the fire at once (every 90 s)
+##     Hold the line    for 30 s squads within 150 m fire faster and cannot be pinned (every 120 s)
 ## Lamps, pigeons, dogs and dispatch riders come later.
 
 const NEAR := 150.0                            # instant orders, and the officer's steadying, within this
@@ -45,6 +53,11 @@ const REPORT_MEN := 3                          # a squad reports when it has los
 const UNDER_FIRE_GAP := 60.0
 const STEADY := 1.25                           # hit chance near the officer
 const CALM := 0.67                             # suppression near the officer
+const RALLY_EVERY := 90.0
+const HOLD_S := 30.0
+const HOLD_EVERY := 120.0
+const LINEMEN_MEND_R := 700.0
+const LAY_NEAR := 25.0                         # linemen lay wire only where they walk within this of its line
 const WIRE_POINTS := ["hq", "telegraph"]
 const RUNNER_POINTS := ["hq", "runner_post"]
 
@@ -88,6 +101,8 @@ var _ow := 1.0                                 # how wide the comms map's bands 
 var note := ""
 var _note_t := 0.0
 var rng := RandomNumberGenerator.new()
+var rally_at := -999.0                         # when the officer last rallied
+var hold_at := -999.0                          # when "hold the line" was last called
 var stats := {"runners_sent": 0, "runners_lost": 0, "orders": 0, "instant": 0, "reports": 0}
 
 
@@ -180,6 +195,8 @@ func reset(nav_grid: NavGrid, map_data: MapData) -> void:
 	wounded = false
 	heal_t = 0.0
 	t = 0.0
+	rally_at = -999.0
+	hold_at = -999.0
 	wiring = false
 	_wire_from = null
 	_over_box.visible = false
@@ -286,7 +303,7 @@ func points() -> Array[BuildSite]:
 
 
 func live(w: Dictionary) -> bool:
-	return not bool(w["cut"]) and (w["a"] as BuildSite).done and (w["b"] as BuildSite).done \
+	return float(w.get("laid", 1.0)) >= 1.0 and not bool(w["cut"]) and (w["a"] as BuildSite).done and (w["b"] as BuildSite).done \
 		and build.sites.has(w["a"]) and build.sites.has(w["b"])
 
 
@@ -447,6 +464,7 @@ func step(dt: float) -> void:
 		_wire_danger()
 		_watch_reports()
 	_run_fixers(dt)
+	_run_linemen()
 	_run_officer(dt)
 	_show_tags()
 	if _wires_dirty:
@@ -667,7 +685,7 @@ func _runner_falls(m: Dictionary) -> void:
 
 ## Lays a wire between two wired points (HQ or telegraph post, finished or not). It works once both ends are
 ## finished. Returns false (and says why) if it cannot.
-func lay_wire(a: BuildSite, b: BuildSite) -> bool:
+func lay_wire(a: BuildSite, b: BuildSite, at_once := true) -> bool:
 	if a == b or a == null or b == null:
 		return false
 	if not (a.kind in WIRE_POINTS and b.kind in WIRE_POINTS):
@@ -680,7 +698,8 @@ func lay_wire(a: BuildSite, b: BuildSite) -> bool:
 		if (w["a"] == a and w["b"] == b) or (w["a"] == b and w["b"] == a):
 			say("Already wired")
 			return false
-	wires.append({"a": a, "b": b, "cut": false, "cut_at": Vector2.ZERO, "fixer": null})
+	wires.append({"a": a, "b": b, "cut": false, "cut_at": Vector2.ZERO, "fixer": null, "laid": 1.0 if at_once else 0.0,
+		"crew": null, "stage": ""})
 	_wires_dirty = true
 	return true
 
@@ -689,7 +708,7 @@ func lay_wire(a: BuildSite, b: BuildSite) -> bool:
 func cut_near(p: Vector2, r: float) -> bool:
 	var any := false
 	for w in wires:
-		if bool(w["cut"]):
+		if bool(w["cut"]) or float(w.get("laid", 1.0)) < 1.0:
 			continue
 		var q := Geometry2D.get_closest_point_to_segment(p, (w["a"] as BuildSite).center(), (w["b"] as BuildSite).center())
 		if q.distance_to(p) <= r:
@@ -748,7 +767,7 @@ func _run_fixers(dt: float) -> void:
 		var sq: Variant = w["fixer"]
 		if sq == null:
 			continue
-		if not is_instance_valid(sq) or (sq as Squad).men.is_empty() or (sq as Squad).get_meta("fix", null) != w:
+		if not is_instance_valid(sq) or (sq as Squad).men.is_empty() or _meta(sq, "fix") != w:
 			w["fixer"] = null
 			continue
 		var s: Squad = sq
@@ -770,7 +789,7 @@ func _run_fixers(dt: float) -> void:
 				var q := nav.nearest_open(at + Vector2(cos(a), sin(a)) * 1.6)
 				spots.append(q)
 				faces.append((at - q).normalized() if at.distance_to(q) > 0.1 else Vector2(0, -1))
-				clips.append("eng_hammer_low" if i % 2 == 0 else "eng_hold")
+				clips.append(("eng_hammer_low" if i % 2 == 0 else "eng_hold") if s.is_engineers() else "kneel_work")
 			s.start_work(spots, faces, clips)
 		var ft := float(s.get_meta("fix_t", 0.0)) + dt * float(maxi(s.men_at_work(), 0)) / 4.0
 		s.set_meta("fix_t", ft)
@@ -806,6 +825,17 @@ func _build_wire_mesh() -> void:
 		var B := Vector2(pb.x, pb.z)
 		var n := maxi(1, int(A.distance_to(B) / POLE_GAP))
 		var tops: Array[Vector3] = [pa]
+		var laid := float(w.get("laid", 1.0))
+		if laid < 1.0:
+			# Being laid: the poles and wire as far as the linemen have got.
+			var upto := int(laid * n)
+			for k in range(1, upto + 1):
+				var q := A.lerp(B, float(k) / n)
+				xfs.append(Transform3D(Basis(), Vector3(q.x, nav.height(q) + 2.5, q.y)))
+				tops.append(Vector3(q.x, nav.height(q) + 4.8, q.y))
+			if tops.size() > 1:
+				lines.append([tops, -1, false])
+			continue
 		for k in range(1, n):
 			var q := A.lerp(B, float(k) / n)
 			var y := nav.height(q)
@@ -888,6 +918,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		if k.keycode == KEY_O:
 			overlay = not overlay
 			get_viewport().set_input_as_handled()
+		elif k.keycode == KEY_Z:
+			rally()
+			get_viewport().set_input_as_handled()
+		elif k.keycode == KEY_U:
+			hold()
+			get_viewport().set_input_as_handled()
 		elif k.keycode == KEY_ESCAPE and wiring:
 			stop_wiring()
 			get_viewport().set_input_as_handled()
@@ -915,8 +951,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _wire_from == null:
 		_wire_from = p
 		return
-	if lay_wire(_wire_from, p):
-		say("Wire laid (%d m)" % int(_wire_from.center().distance_to(p.center())))
+	if lay_wire(_wire_from, p, false):
+		say("Wire planned (%d m): %s" % [int(_wire_from.center().distance_to(p.center())),
+			"linemen will lay it" if not _linemen().is_empty() else "recruit linemen at the HQ to lay it"])
 		if mb.shift_pressed:
 			_wire_from = p
 		else:
@@ -1129,6 +1166,166 @@ func _run_officer(dt: float) -> void:
 			_arrived_report("The officer is back on his feet", s.center(), t)
 
 
+# ------------------------------------------------------------------ the officer's powers
+
+## Seconds until Rally can be used again (0: ready).
+func rally_wait() -> float:
+	return maxf(0.0, rally_at + RALLY_EVERY - t)
+
+
+func hold_wait() -> float:
+	return maxf(0.0, hold_at + HOLD_EVERY - t)
+
+
+## True while "hold the line" lasts.
+func hold_on() -> bool:
+	return t - hold_at < HOLD_S and has_officer() and not wounded
+
+
+func _power_ok(wait: float) -> bool:
+	if not has_officer() or run_over:
+		return false
+	if wounded:
+		say("The officer is wounded")
+		return false
+	if wait > 0.0:
+		say("Not ready yet (%d s)" % int(ceil(wait)))
+		return false
+	return true
+
+
+## Rally: squads within 150 m of the officer shake off the fire and stop being pinned. Returns how many.
+func rally() -> int:
+	if not _power_ok(rally_wait()):
+		return 0
+	rally_at = t
+	var n := 0
+	for s in squads.squads:
+		if s != officer and s.side == 0 and near_officer(s):
+			s.supp = 0.0
+			s.pinned = false
+			n += 1
+	officer.act(officer.officer_index(), "rally")
+	say("Rally! (%d squad%s)" % [n, "" if n == 1 else "s"])
+	return n
+
+
+## Hold the line: for 30 s squads near the officer fire faster and cannot be pinned; he plants his feet.
+func hold() -> bool:
+	if not _power_ok(hold_wait()):
+		return false
+	hold_at = t
+	var j := officer.officer_index()
+	officer.act(j, "hold")
+	officer.md[j]["act_until"] = officer.clock + HOLD_S
+	officer.path.clear()
+	say("Hold the line! (30 s)")
+	return true
+
+
+# ------------------------------------------------------------------ linemen
+
+func _linemen() -> Array[Squad]:
+	var out: Array[Squad] = []
+	for s in squads.squads:
+		if s.kind == "linemen" and not s.men.is_empty():
+			out.append(s)
+	return out
+
+
+## A lineman section with nothing to do: no wire job, not mending, not on the move, no order in the last 10 s.
+func _free(s: Squad) -> bool:
+	return not s.has_meta("wire_job") and not s.has_meta("fix") and not s.moving() \
+		and t - float(s.get_meta("order_got", -999.0)) > 10.0
+
+
+## Linemen take planned wires (walk to the first end, then out along it) and mend cuts when free.
+func _run_linemen() -> void:
+	var crews := _linemen()
+	for w in wires:
+		if float(w.get("laid", 1.0)) >= 1.0:
+			continue
+		var a: BuildSite = w["a"]
+		var b: BuildSite = w["b"]
+		if not build.sites.has(a) or not build.sites.has(b):
+			continue
+		var sq: Variant = w["crew"]
+		if sq != null and (not is_instance_valid(sq) or (sq as Squad).men.is_empty() or _meta(sq, "wire_job") != w):
+			w["crew"] = null
+			sq = null
+		if sq == null:
+			var best: Squad = null
+			var bd := INF
+			for c in crews:
+				if _free(c) and c.center().distance_to(a.center()) < bd:
+					bd = c.center().distance_to(a.center())
+					best = c
+			if best == null:
+				continue
+			w["crew"] = best
+			best.set_meta("wire_job", w)
+			w["stage"] = "to_start"
+			best.status = "to lay wire"
+			best.order_move(_wire_side(a, b))
+			continue
+		var s: Squad = sq
+		var A := a.center()
+		var B := b.center()
+		match String(w["stage"]):
+			"to_start":
+				if not s.moving():
+					if s.center().distance_to(A) < 40.0:
+						w["stage"] = "laying"
+						s.order_move(_wire_side(b, a))
+					else:
+						s.order_move(_wire_side(a, b))
+			"laying":
+				var L := maxf(A.distance_to(B), 1.0)
+				var u := clampf((s.center() - A).dot((B - A) / L) / L, 0.0, 1.0)
+				var off_line := Geometry2D.get_closest_point_to_segment(s.center(), A, B).distance_to(s.center())
+				if u > float(w["laid"]) + 0.01 and off_line < LAY_NEAR:
+					w["laid"] = minf(u, 0.99)
+					_wires_dirty = true
+				s.status = "laying wire %d%%" % int(float(w["laid"]) * 100.0)
+				if not s.moving():
+					if s.center().distance_to(B) < 40.0:
+						w["laid"] = 1.0
+						w["crew"] = null
+						s.remove_meta("wire_job")
+						s.status = ""
+						_wires_dirty = true
+						say("Wire laid by %s" % s.title)
+					else:
+						s.order_move(_wire_side(b, a))
+	# Free linemen mend the nearest cut nobody is mending.
+	for c in crews:
+		if not _free(c):
+			continue
+		var best: Variant = null
+		var bd := LINEMEN_MEND_R
+		for w in wires:
+			if bool(w["cut"]) and w["fixer"] == null:
+				var d := c.center().distance_to(w["cut_at"])
+				if d < bd:
+					bd = d
+					best = w
+		if best != null:
+			fix(c, best)
+
+
+## A squad's note (null when it has none: get_meta with a null default would complain).
+static func _meta(o: Object, key: String) -> Variant:
+	return o.get_meta(key) if o.has_meta(key) else null
+
+
+## Where linemen stand at one end of a wire: just outside the building on the side facing the other end (not its
+## front door, which may face away and send them the long way round).
+func _wire_side(at: BuildSite, other: BuildSite) -> Vector2:
+	var dir := (other.center() - at.center()).normalized()
+	var reach := maxf(at.size.x, at.size.y) * MapData.CELL * 0.5 + 6.0
+	return nav.nearest_open(at.center() + dir * reach)
+
+
 ## Orders to the officer's own squad while he is wounded are refused.
 func can_order(s: Squad) -> bool:
 	return not (s == officer and wounded)
@@ -1171,6 +1368,8 @@ func _draw_overlay() -> void:
 		var a := (w["a"] as BuildSite).center()
 		var b := (w["b"] as BuildSite).center()
 		var col := Color(0.35, 0.9, 1.0) if live(w) else (Color(1.0, 0.3, 0.25) if bool(w["cut"]) else Color(0.6, 0.6, 0.6))
+		if float(w.get("laid", 1.0)) < 1.0:
+			col = Color(0.75, 0.75, 0.75)       # planned: grey until the linemen finish it
 		_path3([a, b], col, 6.0)
 		if bool(w["cut"]):
 			var c: Vector2 = w["cut_at"]
