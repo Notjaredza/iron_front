@@ -188,6 +188,12 @@ func moving() -> bool:
 	return not path.is_empty()
 
 
+## The unit card's run/walk switch: speeds up or slows down a squad that is on the move.
+func set_running(on: bool) -> void:
+	if moving():
+		running = on
+
+
 func men_left() -> int:
 	return men.size()
 

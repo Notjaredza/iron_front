@@ -12,6 +12,8 @@ extends Node3D
 ##   the nearest section) walk over and build it: the frame and scaffold go up, then half built, then finished.
 ##   More sections on one building build it faster. A section that finishes its list helps the nearest
 ##   building nobody is working on. Delete or X over a building that is not finished cancels it.
+## - Delete or X over a finished building has engineers take it down: the stages run backwards (half, frame,
+##   plot) in half its build time, then the ground opens again.
 ## - Building is free for now (supply comes later).
 
 const LINE_KINDS := ["wall", "sandbag_line", "wire_belt", "concertina", "hedgehogs", "teeth"]
@@ -259,8 +261,27 @@ func _show_stage(s: BuildSite) -> void:
 
 ## Cancels a building that is not finished: the plot goes and its cells open again.
 func cancel(s: BuildSite) -> void:
-	if s.done or not sites.has(s):
+	if s.done or s.demolish or not sites.has(s):
 		return
+	_remove(s)
+
+
+## Has engineers take a finished building down (the selected ones, or else the nearest section).
+func demolish(s: BuildSite) -> void:
+	if not s.done or not sites.has(s):
+		return
+	s.done = false
+	s.demolish = true
+	s.progress = 1.0
+	s.node.set_lights(false)
+	s.node.far(false)
+	_show_stage(s)
+	var one: Array[BuildSite] = [s]
+	_give_out(one)
+
+
+## Takes a site off the map: its cells open again, and walls or sandbags round it re-join.
+func _remove(s: BuildSite) -> void:
 	for sq in s.crews.duplicate():
 		_leave(sq)
 	for sq in squads.squads:
@@ -333,12 +354,22 @@ func step(dt: float) -> void:
 		if n == 0:
 			continue
 		var before := BuildSite.stage_for(s.progress)
-		s.progress = minf(1.0, s.progress + dt * float(n) / (4.0 * s.work_time))
+		var rate := dt * float(n) / (4.0 * s.work_time)
+		var nm: String = NAMES.get(s.variant if not s.variant.is_empty() else s.kind, s.kind)
+		if s.demolish:
+			s.progress = maxf(0.0, s.progress - rate * 2.0)
+			for sq in s.crews:
+				(sq as Squad).status = "taking down %s %d%%" % [nm, int((1.0 - s.progress) * 100.0)]
+			if s.progress <= 0.0:
+				_taken_down(s)
+				continue
+		else:
+			s.progress = minf(1.0, s.progress + rate)
+			for sq in s.crews:
+				(sq as Squad).status = "building %s %d%%" % [nm, int(s.progress * 100.0)]
 		if BuildSite.stage_for(s.progress) != before:
 			_show_stage(s)
-		for sq in s.crews:
-			(sq as Squad).status = "building %s %d%%" % [NAMES.get(s.variant if not s.variant.is_empty() else s.kind, s.kind), int(s.progress * 100.0)]
-		if s.progress >= 1.0:
+		if s.progress >= 1.0 and not s.demolish:
 			_finish(s)
 
 
@@ -416,6 +447,18 @@ func _finish(s: BuildSite) -> void:
 	s.crews.clear()
 
 
+## A building taken down: it goes, and its crews move on like after finishing one.
+func _taken_down(s: BuildSite) -> void:
+	var crew := s.crews.duplicate()
+	_remove(s)
+	for sq in crew:
+		var q := sq as Squad
+		if q.jobs.is_empty():
+			var next := _nearest_unbuilt(q.at)
+			if next != null:
+				q.jobs.append(next)
+
+
 ## The nearest site nobody is building, within AUTO_HELP metres.
 func _nearest_unbuilt(p: Vector2) -> BuildSite:
 	var best: BuildSite = null
@@ -468,7 +511,11 @@ func _unhandled_input(event: InputEvent) -> void:
 				var p: Variant = _mouse_ground()
 				if p != null:
 					var s: Variant = site_at(p)
-					if s != null and not s.done:
+					if s != null and s.done:
+						say("Engineers will take down the %s" % NAMES.get(s.variant if not s.variant.is_empty() else s.kind, s.kind))
+						demolish(s)
+						get_viewport().set_input_as_handled()
+					elif s != null and not s.demolish:
 						cancel(s)
 						get_viewport().set_input_as_handled()
 		return
@@ -610,4 +657,4 @@ func help() -> String:
 	if busy():
 		t = "Placing %s: %s, R turn, right click or Esc stop (Shift keeps placing)" % [NAMES.get(placing, placing),
 			"drag a line" if is_line(placing) else "left click to place"]
-	return t + "   Delete/X cancel a building not finished" + (("   " + note) if not note.is_empty() else "")
+	return t + "   Delete/X over a building: cancel it, or take it down if finished" + (("   " + note) if not note.is_empty() else "")

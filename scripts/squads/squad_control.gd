@@ -9,6 +9,11 @@ extends Node3D
 ##   on screen they face away from the camera; drawn the other way they face it). A long line makes a wide, shallow
 ##   formation; a short one a narrow, deep one. A preview of every man's place shows while dragging. Always a walk.
 ## - H brings the camera to the selected squads (or the first squad).
+## - Control groups: Ctrl+1..9 saves the selection under that number; 1..9 picks it again, and pressing the same
+##   number twice quickly takes the camera there. A number with no group saved goes on to the other keys
+##   (the blast test's shell sizes).
+## - Unit cards: one card per selected squad at the bottom left, with its men, what it is doing, and a Run/Walk
+##   switch while it moves (see UnitCards).
 ## - Engineers (building round): a move order drops their building jobs; a right click on a building that is not
 ##   finished sends the selected engineers to build it (other squads just move there).
 ## Orders are instant for now: the comms network (step 3) will delay them later.
@@ -18,6 +23,7 @@ const DRAG_PX := 6.0
 const SPREAD := 24.0                           # metres between squads sent together
 const DOUBLE_S := 0.35
 const LINE_PX := 12.0                          # a right drag shorter than this (pixels) is a plain click
+const GROUP_DOUBLE_S := 0.4                    # a second press of a group's number this soon moves the camera
 
 var nav: NavGrid
 var cam: RtsCamera
@@ -36,6 +42,10 @@ var _rstart: Variant = null                    # ... and on the ground (Vector2 
 var _rdrag := false
 var _preview: MeshInstance3D
 var _pimm: ImmediateMesh
+var groups := {}                               # number 1..9 -> Array of squads
+var cards: UnitCards
+var _last_group := -1
+var _last_group_t := -10.0
 
 
 func _ready() -> void:
@@ -50,6 +60,9 @@ func _ready() -> void:
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.visible = false
 	layer.add_child(box)
+	cards = UnitCards.new()
+	cards.control = self
+	layer.add_child(cards)
 	_pimm = ImmediateMesh.new()
 	_preview = MeshInstance3D.new()
 	_preview.mesh = _pimm
@@ -65,6 +78,7 @@ func spawn(nav_grid: NavGrid, around: Vector2, count := 3, engineers := 2) -> vo
 	for s in squads:
 		s.queue_free()
 	squads.clear()
+	groups.clear()
 	for k in count:
 		var where := nav.nearest_open(around + Vector2((float(k) - (count - 1) * 0.5) * SPREAD, 0))
 		var s := Squad.new()
@@ -147,16 +161,61 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	var k := event as InputEventKey
 	if k == null or not k.pressed or k.echo:
 		return
+	if k.keycode >= KEY_1 and k.keycode <= KEY_9:
+		var n := k.keycode - KEY_1 + 1
+		if k.ctrl_pressed:
+			save_group(n)
+			get_viewport().set_input_as_handled()
+		elif recall_group(n, Time.get_ticks_msec() / 1000.0):
+			get_viewport().set_input_as_handled()
+		return
 	if k.keycode == KEY_H and not squads.is_empty():
 		var sel := selected()
 		if sel.is_empty():
-			sel = [squads[0]]
-		var c := Vector2.ZERO
-		for s in sel:
-			c += s.at
-		c /= sel.size()
-		cam.target = Vector3(c.x, 0, c.y)
-		cam.height_goal = minf(cam.height_goal, 90.0)
+			sel.append(squads[0])
+		look_at_squads(sel)
+
+
+## Ctrl+number: the selected squads become group n (an empty selection clears it).
+func save_group(n: int) -> void:
+	var sel := selected()
+	if sel.is_empty():
+		groups.erase(n)
+		say("Group %d cleared" % n)
+	else:
+		groups[n] = sel
+		say("Group %d: %d squad%s" % [n, sel.size(), "" if sel.size() == 1 else "s"])
+
+
+## Number: selects group n (false if there is none). The same number again within GROUP_DOUBLE_S moves the camera.
+func recall_group(n: int, now: float) -> bool:
+	if not groups.has(n):
+		return false
+	var g: Array = (groups[n] as Array).filter(func(s: Squad) -> bool: return is_instance_valid(s) and squads.has(s))
+	if g.is_empty():
+		groups.erase(n)
+		return false
+	for s in squads:
+		s.selected = g.has(s)
+	if n == _last_group and now - _last_group_t < GROUP_DOUBLE_S and cam != null:
+		var typed: Array[Squad] = []
+		typed.assign(g)
+		look_at_squads(typed)
+	_last_group = n
+	_last_group_t = now
+	return true
+
+
+## The camera goes to the middle of these squads.
+func look_at_squads(sel: Array[Squad]) -> void:
+	if sel.is_empty() or cam == null:
+		return
+	var c := Vector2.ZERO
+	for s in sel:
+		c += s.at
+	c /= sel.size()
+	cam.target = Vector3(c.x, 0, c.y)
+	cam.height_goal = minf(cam.height_goal, 90.0)
 
 
 func _select_click(at: Vector2, add: bool) -> void:
@@ -326,7 +385,7 @@ func _process(delta: float) -> void:
 
 func help() -> String:
 	var n := selected().size()
-	return "Left click/drag select squads (Shift adds), right click move, double right click run, right drag draw a line, H go to squads   [%d selected]%s" % [
+	return "Left click/drag select squads (Shift adds), right click move, double right click run, right drag draw a line, H go to squads, Ctrl+1-9 save a group, 1-9 pick it (twice: go there)   [%d selected]%s" % [
 		n, ("   " + note) if not note.is_empty() else ""]
 
 

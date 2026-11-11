@@ -7,6 +7,8 @@ extends SceneTree
 ## 4. Engineers: the nearest section walks over, its four men take their spots outside the footprint and build;
 ##    the stages run plot, frame, half built, finished in order, in about the building's work time. Two
 ##    sections on one building build it faster. A section that finishes helps the nearest unbuilt building.
+## 5. Taking down: a finished building is taken down by the engineers, its stages running backwards in half its
+##    build time; then it is gone and its cells are open again.
 ## Run:  Godot --headless --path . --script res://tools/check_build.gd [-- --seeds=1,2]
 ## Ends with "BUILD CHECK DONE <seeds> <fails>".
 
@@ -217,5 +219,30 @@ func _check(seed: int) -> void:
 	bc.assign(e1, mg)
 	var t3 := _run(sc, bc, 300.0, func() -> bool: return mg.done and pit.done)
 	_ok(mg.done and pit.done, "after the MG nest the section builds the gun pit nobody was given (%.0f s)" % t3)
+
+	# 5. Taking down the barracks.
+	var bar_cells := bar.cells()
+	bc.demolish(bar)
+	_ok(bar.demolish and not bar.done and (e1.jobs.has(bar) or e2.jobs.has(bar)), "taking down the barracks: an engineer section is sent")
+	var down: Array[int] = [bar.node.stage]
+	var t_down := [0.0]
+	var t_work := _run(sc, bc, 400.0, func() -> bool: return not bc.sites.has(bar), func() -> void:
+		if bc.sites.has(bar):
+			if bar.node.stage != down[-1]:
+				down.append(bar.node.stage)
+			var n := 0
+			for sq in bar.crews:
+				n += (sq as Squad).men_at_work()
+			if n > 0:
+				t_down[0] += DT)
+	_ok(not bc.sites.has(bar), "the barracks is gone (%.0f s)" % t_work)
+	_ok(down == [3, 2, 1, 0], "stages run backwards: %s" % str(down))
+	var half := bar.work_time * 0.5
+	_ok(absf(t_down[0] - half) < half * 0.2, "taken down in %.0f s of work (half its build time: %.0f s)" % [t_down[0], half])
+	var free := true
+	for cc in bar_cells:
+		if nav.open[cc.y * d.w + cc.x] != 1 or bc.at_cell.has(cc):
+			free = false
+	_ok(free, "its cells are open again")
 	sc.free()
 	bc.free()
