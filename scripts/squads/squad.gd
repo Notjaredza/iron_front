@@ -27,6 +27,9 @@ const LINE_DEPTH := 2.5
 const CRUMB := 0.5                             # trail spacing (m)
 const MIN_FILES := 3                           # narrowest line: 3 men wide, 4 ranks deep
 
+## Men who take twice the hits: the zombie brute, and the host's men in armour.
+const ARMOURED := ["brute", "man_at_arms", "heavy", "captain"]
+
 ## The clips an engineer can work with (baked into the engineers' library).
 const WORK_CLIPS := ["eng_hammer", "eng_hammer_low", "eng_saw", "eng_shovel", "eng_pick", "eng_drive", "eng_hold",
 	"eng_nco_check"]
@@ -109,7 +112,7 @@ func setup(nav_grid: NavGrid, where: Vector2, face: Vector2, seed_value: int, na
 		var cm := TroopKinds.clip_map(kind, s)
 		men.append(s)
 		players.append(ap)
-		md.append({"clips": cm, "act_until": 0.0, "hp": int(spec["hp"]) * (2 if roles[i] == "brute" else 1),
+		md.append({"clips": cm, "act_until": 0.0, "hp": int(spec["hp"]) * (2 if roles[i] in ARMOURED else 1),
 			"next_shot": randf() * 1.5, "shots": 0, "goal": null})
 		_clip.append("")
 		_at_work.append(false)
