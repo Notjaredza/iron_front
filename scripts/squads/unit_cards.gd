@@ -1,7 +1,8 @@
 class_name UnitCards
 extends VBoxContainer
 ## Iron Front: unit cards (bottom left), one per selected squad: its name, how many men, what it is doing, and a
-## Run/Walk switch that speeds up or slows down a squad on the move. Click a card's name to select only that squad.
+## Run/Walk switch that speeds up or slows down a squad on the move (fighting round 2: men left of full strength, and
+## ammo). Click a card's name to select only that squad.
 ## The switch is greyed out while the squad stands still (a halted squad has nothing to speed up).
 
 const W := 230.0
@@ -88,7 +89,10 @@ func _fill(c: Dictionary) -> void:
 		doing = s.status
 	elif s.moving():
 		doing = "running" if s.running else "walking"
-	(c["info"] as Label).text = "%d men   %s" % [s.men.size(), doing]
+	if s.out_of_ammo():
+		doing = "OUT OF AMMO   " + doing
+	var ammo := ("   ammo %d%%" % roundi(s.ammo_frac() * 100.0)) if s.can_fire() else ""
+	(c["info"] as Label).text = "%d of %d men%s   %s" % [s.men.size(), s.full, ammo, doing]
 	var run: Button = c["run"]
 	run.disabled = not s.moving()
 	run.set_pressed_no_signal(s.moving() and s.running)

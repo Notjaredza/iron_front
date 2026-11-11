@@ -53,6 +53,7 @@ func _ready() -> void:
 	combat.squads = squads
 	combat.build = build
 	combat.blasts = blasts
+	combat.view = view
 	squads.combat = combat
 	var layer := CanvasLayer.new()
 	add_child(layer)
