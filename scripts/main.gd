@@ -6,6 +6,8 @@ extends Node3D
 ## Fighting round: J, K and L send an enemy wave (red coats, medieval host, zombies); see CombatControl.
 ## Comms round: the officer and two guards start behind them; orders to squads far from him travel by runner or
 ## telegraph wire, and reports come back the same way; O shows the comms map (see CommsControl).
+## Recruitment round: supply (top of the screen) pays for buildings and recruits; click a finished barracks or HQ
+## to recruit (see RecruitControl); Shift+right click chains moves; the officer's card has Rally and Hold the line.
 ## Command-line options after `--`: --seed=N, and --size=WxH in cells (for small test maps).
 
 var view: MapView
@@ -21,6 +23,7 @@ var squads: SquadControl
 var build: BuildControl                # building round: the build menu, placing and the engineers' work
 var combat: CombatControl              # fighting round: shooting, cover, pinned, hand to hand, enemy waves (J, K, L)
 var comms: CommsControl                # comms round: the officer, runners, telegraph wire, reports (O comms map)
+var recruit: RecruitControl            # recruitment round: supply, recruiting at the barracks and HQ, rally points
 
 
 func _ready() -> void:
@@ -67,6 +70,12 @@ func _ready() -> void:
 	squads.comms = comms
 	build.comms = comms
 	combat.comms = comms
+	recruit = RecruitControl.new()
+	add_child(recruit)                 # after the comms: a click on a barracks or HQ selects it first
+	recruit.cam = cam
+	recruit.squads = squads
+	recruit.build = build
+	build.economy = recruit
 	var layer := CanvasLayer.new()
 	add_child(layer)
 	hud = Label.new()
@@ -93,6 +102,7 @@ func new_map(s: int) -> void:
 	build.reset(nav, view.data)
 	combat.reset(nav, view.data)
 	comms.reset(nav, view.data)
+	recruit.reset(nav)
 	squads.spawn(nav, Vector2(sz.x * 0.5, sz.y * 0.5))
 	comms.spawn_officer(Vector2(sz.x * 0.5, sz.y * 0.5 + 45.0))
 	var first := squads.squads[0].at
@@ -124,4 +134,4 @@ func _process(_delta: float) -> void:
 		return
 	view.follow(cam.height)
 	hud.text = "Iron Front map test   seed %d   %s   %d FPS   height %d m\nWASD move, wheel zoom, Q/E turn, T day/night/fog, N new map\n%s\n%s\n%s\n%s" % [
-		seed, view.look_name(), Engine.get_frames_per_second(), int(cam.height), blasts.help(), squads.help(), build.help(), combat.help() + "\n" + comms.help()]
+		seed, view.look_name(), Engine.get_frames_per_second(), int(cam.height), blasts.help(), squads.help(), build.help(), combat.help() + "\n" + comms.help() + "\n" + recruit.help()]

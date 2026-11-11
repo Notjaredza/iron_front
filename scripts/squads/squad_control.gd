@@ -22,6 +22,8 @@ extends Node3D
 ## Comms round: every order goes through the CommsControl (`dispatch`): squads near the officer take it at once,
 ## the rest when a runner or the wire brings it. A right click on a cut telegraph wire with engineers selected
 ## sends them to splice it. The wounded officer takes no orders.
+## Recruitment round: Shift+right click chains moves (each squad goes on to the next point when it gets to the
+## last; a dotted line shows the chain while selected). A plain order clears the chain.
 
 const PICK_PX := 22.0
 const DRAG_PX := 6.0
@@ -146,7 +148,7 @@ func _unhandled_input(event: InputEvent) -> void:
 					_order_line(_rstart, end)
 					_last_right = -10.0                   # a drag never starts a double click
 				else:
-					_right_click(mb.position)
+					_right_click(mb.position, mb.shift_pressed)
 	elif event is InputEventMouseMotion and _rdown:
 		var mm := event as InputEventMouseMotion
 		if not _rdrag and _rpress.distance_to(mm.position) > LINE_PX and not selected().is_empty():
@@ -255,7 +257,7 @@ func _select_box(r: Rect2, add: bool) -> void:
 
 
 ## A right click (no drag): move there; a second click soon after runs to the first click's spot.
-func _right_click(at: Vector2) -> void:
+func _right_click(at: Vector2, chain := false) -> void:
 	var now := Time.get_ticks_msec() / 1000.0
 	var run := now - _last_right < DOUBLE_S
 	_last_right = now
@@ -267,6 +269,9 @@ func _right_click(at: Vector2) -> void:
 		g = _last_target
 	_last_target = g
 	var sel := orderable(selected())
+	if chain:
+		order_chain(g, run, sel)
+		return
 	if combat != null and not run and not sel.is_empty():
 		var foe: Variant = combat.enemy_at(g)
 		if foe != null:
@@ -329,6 +334,31 @@ func _right_click(at: Vector2) -> void:
 							build.assign(s, site, true), "build")
 			sel = rest
 	_order(g, run, sel)
+
+
+## Shift+right click: each squad adds g (spread side by side as a plain move would) to the end of its chain.
+## A double Shift click makes the last leg a run.
+func order_chain(g: Vector2, run: bool, sel: Array[Squad]) -> void:
+	if sel.is_empty():
+		return
+	var c := Vector2.ZERO
+	for s in sel:
+		c += s.queue.back()[0] if not s.queue.is_empty() else (s.path[s.path.size() - 1] if s.moving() else s.at)
+	c /= sel.size()
+	var fwd := (g - c).normalized() if g.distance_to(c) > 1.0 else Vector2(0, -1)
+	var side := Vector2(-fwd.y, fwd.x)
+	sel.sort_custom(func(a: Squad, b: Squad) -> bool: return a.at.dot(side) < b.at.dot(side))
+	var spots := {}
+	for i in sel.size():
+		spots[sel[i]] = nav.nearest_open(g + side * (float(i) - (sel.size() - 1) * 0.5) * SPREAD)
+	dispatch(sel, func(got: Array[Squad]) -> void:
+		for s in got:
+			if run and not s.queue.is_empty():
+				s.queue.back()[1] = true
+			elif run and s.queue.is_empty() and s.moving():
+				s.running = true
+			else:
+				s.queue_move(spots[s], run), "chain")
 
 
 ## Gives an order to these squads through the comms (at once if there is none): `apply` gets the squads it reached.

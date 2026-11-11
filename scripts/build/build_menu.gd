@@ -67,8 +67,9 @@ func _show_tab(i: int) -> void:
 		c.queue_free()
 	for kind: String in TABS[i][1]:
 		var b := Button.new()
-		b.custom_minimum_size = Vector2(PIC + 8, PIC + 26)
-		b.text = BuildControl.NAMES.get(kind, kind)
+		b.custom_minimum_size = Vector2(PIC + 8, PIC + 40)
+		var cost := RecruitControl.build_cost(kind)
+		b.text = BuildControl.NAMES.get(kind, kind) + ("\n%d%s" % [cost, " each" if BuildControl.is_line(kind) else ""] if cost > 0 else "")
 		b.icon = pics.get(kind, null)
 		b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		b.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP

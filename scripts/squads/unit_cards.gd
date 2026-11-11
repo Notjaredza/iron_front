@@ -76,6 +76,19 @@ func _rebuild(sel: Array[Squad]) -> void:
 		row.add_child(run)
 		add_child(panel)
 		var c := {"squad": s, "name": name_b, "info": info, "run": run}
+		if s.kind == "officer" and control.comms != null:
+			# The officer's powers (recruitment round): Rally (Z) and Hold the line (U).
+			var pw := HBoxContainer.new()
+			col.add_child(pw)
+			for p: Array in [["Rally (Z)", "rally"], ["Hold the line (U)", "hold"]]:
+				var b := Button.new()
+				b.text = p[0]
+				b.focus_mode = Control.FOCUS_NONE
+				b.add_theme_font_size_override("font_size", 12)
+				var what: String = p[1]
+				b.pressed.connect(func() -> void: control.comms.call(what))
+				pw.add_child(b)
+				c[what] = b
 		_cards.append(c)
 		_fill(c)
 
@@ -95,6 +108,14 @@ func _fill(c: Dictionary) -> void:
 		doing += "   " + s.comms_tag
 	var ammo := ("   ammo %d%%" % roundi(s.ammo_frac() * 100.0)) if s.can_fire() else ""
 	(c["info"] as Label).text = "%d of %d men%s   %s" % [s.men.size(), s.full, ammo, doing]
+	if c.has("rally"):
+		var cm: Node = control.comms
+		var rw: float = cm.rally_wait()
+		var hw: float = cm.hold_wait()
+		(c["rally"] as Button).text = "Rally (Z)" if rw <= 0.0 else "Rally %d s" % int(ceil(rw))
+		(c["rally"] as Button).disabled = rw > 0.0 or cm.wounded
+		(c["hold"] as Button).text = ("Holding!" if cm.hold_on() else "Hold the line (U)") if hw <= 0.0 or cm.hold_on() else "Hold %d s" % int(ceil(hw))
+		(c["hold"] as Button).disabled = hw > 0.0 or cm.wounded
 	var run: Button = c["run"]
 	run.disabled = not s.moving()
 	run.set_pressed_no_signal(s.moving() and s.running)
