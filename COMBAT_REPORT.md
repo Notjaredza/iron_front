@@ -30,7 +30,7 @@ The user's answers:
   - Medieval men, archers and zombies are never pinned.
 - **Hand to hand:**
   - Men within reach of an enemy man go for him and strike: our bayonets, red coat bayonets, swords, spears, polearms, claws and bites. Each blow kills by its kind's chance.
-  - Zombies take two hits; a brute takes four, but a shell kills anything.
+  - Zombies take two hits; a brute takes four. The host's men-at-arms, heavies and captains are armoured and take two. A shell kills anything.
   - Our squads can walk away from a fight when ordered.
 - **Each enemy its own way:**
   - **Red coats** march up in line, halt at musket range (about 75 m) and fire a volley with smoke. Then they fix bayonets and charge through the smoke, at once if we come close.
@@ -55,7 +55,7 @@ The user's answers:
   - archers halt at about 108 m and shoot, and the foot reach hand to hand;
   - an MG nest manned and firing, and leaving it;
   - a shell's kills and shock.
-  - Seeds 1-3: COMBAT CHECK DONE 0. The squad, building and controls checks still pass.
+  - Seeds 1-3, and six repeat runs: COMBAT CHECK DONE 0. The squad, building and controls checks still pass.
 - **tools/fight_shots.gd** (needs a screen or xvfb) saves fight pictures to results/fight/ (git-ignored): the red coat volley and charge, zombies closing, the host running in, the manned MG nest, and a pinned squad.
 
 ## Balance (all numbers in scripts/combat/troop_kinds.gd SPEC and combat_control.gd)
