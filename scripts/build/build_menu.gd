@@ -12,7 +12,7 @@ const TABS := [
 	["Defences", ["sandbag_line", "wire_belt", "concertina", "hedgehogs", "teeth", "mg_nest", "gun_pit"]],
 	["Walls", ["wall", "tower", "bastion", "gate"]],
 	["Rail", ["halt", "station", "engine_shed", "water_tower", "coal_stage", "signal_box"]],
-	["Comms", ["runner_post", "telegraph", "lamp_tower", "pigeon_loft"]],
+	["Comms", ["runner_post", "telegraph", "tele_wire", "lamp_tower", "pigeon_loft"]],
 	["Research", ["lab_comms", "lab_weapons", "lab_rail", "lab_defences", "wreck_yard"]],
 ]
 const PIC := 96
@@ -81,6 +81,8 @@ func _show_tab(i: int) -> void:
 
 
 static func _tip(kind: String) -> String:
+	if kind == "tele_wire":
+		return "Telegraph wire: click the HQ or a telegraph post, then another (up to 600 m); Shift keeps going"
 	if BuildControl.is_line(kind):
 		return "%s: press and drag to lay a line" % BuildControl.NAMES.get(kind, kind)
 	var t := BuildControl.footprint(kind)
@@ -112,6 +114,8 @@ func _draw_pictures() -> void:
 	c.current = true
 	for t: Array in TABS:
 		for kind: String in t[1]:
+			if kind == "tele_wire":
+				continue                           # a tool, not a building: its button keeps its name
 			var b := BuildControl.make_building(kind)
 			vp.add_child(b)
 			var hs := b.half_size()

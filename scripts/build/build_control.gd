@@ -28,7 +28,7 @@ const NAMES := {"hq": "HQ", "barracks": "Barracks", "depot": "Depot", "halt": "H
 	"lab_comms": "Comms lab", "lab_weapons": "Weapons lab", "lab_rail": "Rail lab", "lab_defences": "Defences lab",
 	"wreck_yard": "Wreck yard", "sandbag_line": "Sandbags", "wire_belt": "Wire belt", "concertina": "Concertina",
 	"hedgehogs": "Hedgehogs", "teeth": "Teeth", "mg_nest": "MG nest", "gun_pit": "Gun pit", "wall": "Wall",
-	"tower": "Tower", "bastion": "Bastion", "gate": "Road gate"}
+	"tower": "Tower", "bastion": "Bastion", "gate": "Road gate", "tele_wire": "Telegraph wire"}
 const LINE_TIME := {"wall": 14.0, "sandbag_line": 8.0, "wire_belt": 6.0, "concertina": 5.0, "hedgehogs": 5.0,
 	"teeth": 8.0, "tower": 40.0, "bastion": 40.0, "gate": 24.0}
 
@@ -50,6 +50,7 @@ var _ghost_kind := ""
 var _line_from: Variant = null                 # the cell a line drag started on
 var _far := false
 var _night := false
+var comms: Node                                # the CommsControl: "Telegraph wire" in the menu hands over to it
 
 
 func _ready() -> void:
@@ -326,9 +327,13 @@ func _give_out(new_sites: Array[BuildSite]) -> void:
 			say("No engineers to build it")
 			return
 		crew = [best]
-	for sq in crew:
-		for s in new_sites:
-			assign(sq, s)
+	var typed: Array[Squad] = []
+	typed.assign(crew)
+	squads.dispatch(typed, func(got: Array[Squad]) -> void:
+		for sq in got:
+			for s in new_sites:
+				if sites.has(s):
+					assign(sq, s), "build")
 
 
 func _leave(sq: Squad) -> void:
@@ -476,6 +481,13 @@ func _nearest_unbuilt(p: Vector2) -> BuildSite:
 # ------------------------------------------------------------------ input and the ghost
 
 func start_placing(k: String) -> void:
+	if k == "tele_wire":
+		stop_placing()
+		if comms != null:
+			comms.start_wiring()
+		return
+	if comms != null:
+		comms.stop_wiring()
 	placing = k
 	_line_from = null
 	if k in WALL_PIECES or (family_of(k) != "" and not is_line(k)):

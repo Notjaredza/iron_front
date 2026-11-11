@@ -19,7 +19,9 @@ extends Node3D
 ## - Fighting round: a right click on an enemy squad has the selected squads attack it (they close to range and
 ##   fire); a right click on a finished MG nest or gun pit sends the first selected rifle squad to man it, and on a
 ##   house, ruin or one of our finished buildings to go in and fight from it (fighting round 2).
-## Orders are instant for now: the comms network (step 3) will delay them later.
+## Comms round: every order goes through the CommsControl (`dispatch`): squads near the officer take it at once,
+## the rest when a runner or the wire brings it. A right click on a cut telegraph wire with engineers selected
+## sends them to splice it. The wounded officer takes no orders.
 
 const PICK_PX := 22.0
 const DRAG_PX := 6.0
@@ -32,6 +34,7 @@ var nav: NavGrid
 var cam: RtsCamera
 var build: Node                                # the BuildControl (engineers' jobs), if there is one
 var combat: Node                               # the CombatControl (attack and man-a-post orders), if there is one
+var comms: Node                                # the CommsControl (orders travel), if there is one
 var squads: Array[Squad] = []
 var box: Panel
 var note := ""
@@ -263,41 +266,100 @@ func _right_click(at: Vector2) -> void:
 	if run:
 		g = _last_target
 	_last_target = g
-	var sel := selected()
+	var sel := orderable(selected())
 	if combat != null and not run and not sel.is_empty():
 		var foe: Variant = combat.enemy_at(g)
 		if foe != null:
-			for s in sel:
-				s.cancel_job()
-				s.attack = foe
+			dispatch(sel, func(got: Array[Squad]) -> void:
+				for s in got:
+					if is_instance_valid(foe) and not foe.men.is_empty():
+						s.cancel_job()
+						s.attack = foe, "attack")
 			say("Attack %s" % foe.title)
 			return
 	if build != null and combat != null and not run:
 		var post: Variant = build.site_at(g)
 		if post != null and post.done and post.kind in ["mg_nest", "gun_pit"]:
 			for s in sel:
-				if s.can_fire():
-					combat.man_post(s, post)
+				if s.can_fire() and s.kind == "rifles":
+					var one: Array[Squad] = [s]
+					dispatch(one, func(got: Array[Squad]) -> void:
+						if build.sites.has(post):
+							combat.man_post(got[0], post), "man the post")
 					return
 	if combat != null and not run:
 		var house: Variant = combat.garrison_at(g)
 		if house != null:
 			for s in sel:
-				if s.can_fire():
-					combat.garrison(s, house)
+				if s.can_fire() and s.kind == "rifles":
+					var one: Array[Squad] = [s]
+					dispatch(one, func(got: Array[Squad]) -> void:
+						combat.garrison(got[0], house), "go in")
 					say("%s into the %s" % [s.title, house.label()])
 					return
+	if comms != null and not run:
+		var w: Variant = comms.cut_wire_at(g)
+		var eng: Array[Squad] = []
+		for s in sel:
+			if s.is_engineers():
+				eng.append(s)
+		if w != null and not eng.is_empty():
+			var first: Array[Squad] = [eng[0]]
+			dispatch(first, func(got: Array[Squad]) -> void:
+				if bool(w["cut"]):
+					comms.fix(got[0], w), "splice the wire")
+			say("%s to splice the wire" % eng[0].title)
+			sel.erase(eng[0])
+			if sel.is_empty():
+				return
 	if build != null and not run:
 		var site: Variant = build.site_at(g)
 		if site != null and not site.done:
 			var rest: Array[Squad] = []
+			var eng2: Array[Squad] = []
 			for s in sel:
 				if s.is_engineers():
-					build.assign(s, site, true)
+					eng2.append(s)
 				else:
 					rest.append(s)
+			if not eng2.is_empty():
+				dispatch(eng2, func(got: Array[Squad]) -> void:
+					for s in got:
+						if build.sites.has(site):
+							build.assign(s, site, true), "build")
 			sel = rest
 	_order(g, run, sel)
+
+
+## Gives an order to these squads through the comms (at once if there is none): `apply` gets the squads it reached.
+func dispatch(sel: Array[Squad], apply: Callable, what := "order") -> void:
+	if sel.is_empty():
+		return
+	if comms == null:
+		apply.call(sel)
+	else:
+		comms.send(sel, apply, what)
+
+
+## The squads that can take orders (the wounded officer cannot).
+func orderable(sel: Array[Squad]) -> Array[Squad]:
+	if comms == null:
+		return sel
+	var out: Array[Squad] = []
+	for s in sel:
+		if comms.can_order(s):
+			out.append(s)
+		else:
+			say("The officer is wounded and takes no orders")
+	return out
+
+
+## The unit card's Run/Walk switch, as an order.
+func order_run(s: Squad, on: bool) -> void:
+	var one: Array[Squad] = orderable([s] as Array[Squad])
+	dispatch(one, func(got: Array[Squad]) -> void:
+		for q in got:
+			q.set_running(on), "run" if on else "walk")
 
 
 func _ground2(mp: Vector2) -> Variant:
@@ -339,16 +401,21 @@ static func plan_line(sel: Array[Squad], a: Vector2, b: Vector2) -> Array:
 
 ## Sends the selected squads onto a drawn line (always at a walk).
 func _order_line(a: Vector2, b: Vector2) -> void:
-	var failed := 0
-	for p: Dictionary in plan_line(selected(), a, b):
-		var s: Squad = p["squad"]
-		var to: Vector2 = p["at"]
-		s.cancel_job()
-		s.attack = null
-		if not s.order_move(to, false, p["face"], p["width"]) and not s.order_move(nav.nearest_open(to), false, p["face"], p["width"]):
-			failed += 1
-	if failed > 0:
-		say("No way there on foot")
+	var plan := {}
+	var sel := orderable(selected())
+	for p: Dictionary in plan_line(sel, a, b):
+		plan[p["squad"]] = p
+	dispatch(sel, func(got: Array[Squad]) -> void:
+		var failed := 0
+		for s in got:
+			var p: Dictionary = plan[s]
+			var to: Vector2 = p["at"]
+			s.cancel_job()
+			s.attack = null
+			if not s.order_move(to, false, p["face"], p["width"]) and not s.order_move(nav.nearest_open(to), false, p["face"], p["width"]):
+				failed += 1
+		if failed > 0:
+			say("No way there on foot"), "line")
 
 
 ## Every man's place on the drawn line: a short tick pointing the way he will face, and an arrow per squad.
@@ -390,15 +457,18 @@ func _order(g: Vector2, run: bool, sel: Array[Squad] = selected()) -> void:
 	var side := Vector2(-fwd.y, fwd.x)
 	# Keep the squads in the same left-to-right order they stand in now.
 	sel.sort_custom(func(a: Squad, b: Squad) -> bool: return a.at.dot(side) < b.at.dot(side))
-	var failed := 0
+	var spots := {}
 	for i in sel.size():
-		var to := g + side * (float(i) - (sel.size() - 1) * 0.5) * SPREAD
-		sel[i].cancel_job()
-		sel[i].attack = null
-		if not sel[i].order_move(to, run, fwd) and not sel[i].order_move(g, run, fwd):
-			failed += 1
-	if failed > 0:
-		say("No way there on foot")
+		spots[sel[i]] = g + side * (float(i) - (sel.size() - 1) * 0.5) * SPREAD
+	dispatch(sel, func(got: Array[Squad]) -> void:
+		var failed := 0
+		for s in got:
+			s.cancel_job()
+			s.attack = null
+			if not s.order_move(spots[s], run, fwd) and not s.order_move(g, run, fwd):
+				failed += 1
+		if failed > 0:
+			say("No way there on foot"), "run" if run else "move")
 
 
 func say(text: String) -> void:

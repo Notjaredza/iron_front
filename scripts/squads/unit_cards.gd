@@ -72,7 +72,7 @@ func _rebuild(sel: Array[Squad]) -> void:
 		run.focus_mode = Control.FOCUS_NONE
 		run.custom_minimum_size = Vector2(62, 0)
 		run.tooltip_text = "Run or walk while on the move"
-		run.toggled.connect(func(on: bool) -> void: s.set_running(on))
+		run.toggled.connect(func(on: bool) -> void: control.order_run(s, on))
 		row.add_child(run)
 		add_child(panel)
 		var c := {"squad": s, "name": name_b, "info": info, "run": run}
@@ -91,6 +91,8 @@ func _fill(c: Dictionary) -> void:
 		doing = "running" if s.running else "walking"
 	if s.out_of_ammo():
 		doing = "OUT OF AMMO   " + doing
+	if not s.comms_tag.is_empty():
+		doing += "   " + s.comms_tag
 	var ammo := ("   ammo %d%%" % roundi(s.ammo_frac() * 100.0)) if s.can_fire() else ""
 	(c["info"] as Label).text = "%d of %d men%s   %s" % [s.men.size(), s.full, ammo, doing]
 	var run: Button = c["run"]
