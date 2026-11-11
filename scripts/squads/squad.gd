@@ -88,6 +88,8 @@ var _lord := -1
 var carried := false                           # officer: the guards carry him (he is wounded)
 var lying := false                             # officer: wounded and lying (at the aid post, or no one to carry him)
 var comms_tag := ""                            # comms round: "order coming", "order in" on the banner
+var queue: Array = []                          # chained orders (Shift+right click): [to, run] after this route
+var deployed := false                          # mortar: set up (halted a while)
 const CARRY_V := 0.9                           # the carry clips' pace (m/s)
 const CARRY_GAP := 1.9                         # metres between the front and rear guard
 
@@ -210,8 +212,9 @@ func _add_man(role: String, seed_value: int, where: Vector2) -> void:
 	var cm := TroopKinds.clip_map(kind, s)
 	men.append(s)
 	players.append(ap)
+	var ms := TroopKinds.man_spec(kind, role)
 	md.append({"role": role, "clips": cm, "act_until": 0.0, "hp": int(spec["hp"]) * (2 if role in ARMOURED else 1),
-		"next_shot": randf() * 1.5, "shots": 0, "goal": null, "ammo": int(spec.get("ammo", 0))})
+		"next_shot": randf() * 1.5, "shots": 0, "goal": null, "ammo": int(ms.get("ammo", 0)), "spec": ms})
 	_clip.append("")
 	_at_work.append(false)
 	var i := men.size() - 1
@@ -236,13 +239,14 @@ func _add_man(role: String, seed_value: int, where: Vector2) -> void:
 
 ## How full the squad's pouches are, 0..1 (1 for troops without guns).
 func ammo_frac() -> float:
-	var most := int(spec.get("ammo", 0))
-	if most <= 0 or men.is_empty():
+	if men.is_empty():
 		return 1.0
 	var n := 0
+	var most := 0
 	for d in md:
 		n += int(d.get("ammo", 0))
-	return float(n) / float(most * md.size())
+		most += int((d.get("spec", spec) as Dictionary).get("ammo", 0))
+	return 1.0 if most <= 0 else float(n) / float(most)
 
 
 func out_of_ammo() -> bool:
@@ -255,6 +259,11 @@ func is_engineers() -> bool:
 
 func can_fire() -> bool:
 	return float(spec["range"]) > 0.0
+
+
+## The rounds a full pouch holds for man i.
+func ammo_max(i: int) -> int:
+	return int((md[i].get("spec", spec) as Dictionary).get("ammo", 0))
 
 
 func _process(delta: float) -> void:
@@ -295,6 +304,18 @@ func _arrive() -> void:
 	path.clear()
 	if face_goal != Vector2.ZERO:
 		heading = face_goal
+	while not queue.is_empty():
+		var nxt: Array = queue.pop_front()
+		if order_move(nxt[0], nxt[1]):
+			break
+
+
+## Shift+right click: go there after the current route (at once if halted).
+func queue_move(to: Vector2, run := false) -> void:
+	if moving():
+		queue.append([to, run])
+	elif not order_move(to, run):
+		queue.clear()
 
 
 ## Halted ranks for a squad of n men `width` wide: [ranks, men in the last rank].
@@ -390,6 +411,9 @@ func _slot_free_n(i: int, n: int) -> Vector2:
 
 ## Engineers: stop work and drop every job (a move order from the player does this). It also leaves a post.
 func cancel_job() -> void:
+	queue.clear()
+	if has_meta("wire_job"):
+		remove_meta("wire_job")                # recruitment round: linemen drop the wire they were laying
 	if has_meta("fix"):
 		remove_meta("fix")                     # comms round: also stops splicing a wire
 		stop_work()
@@ -571,6 +595,8 @@ func _place_men(delta: float) -> void:
 				clip = work_clip[i]
 			elif pinned and has_clip(i, "pinned"):
 				clip = "pinned"
+			elif deployed and has_clip(i, "deployed"):
+				clip = "deployed"
 			if clip != _clip[i]:
 				_play(i, clip)
 			players[i].speed_scale = clampf(v / (run_v if clip == "run" else walk_v), 0.5, 1.6) if clip in ["walk", "run"] else (
@@ -629,6 +655,18 @@ func _draw_route() -> void:
 			_imm.surface_add_vertex(Vector3(p0.x, nav.height(p0) + 0.4, p0.y))
 			_imm.surface_add_vertex(Vector3(p1.x, nav.height(p1) + 0.4, p1.y))
 		a = b
+	# Chained orders: dotted on from the end of the route.
+	var from := path[path.size() - 1]
+	for q: Array in queue:
+		var to: Vector2 = q[0]
+		var n2 := maxi(1, int(from.distance_to(to) / 4.0))
+		for k in n2:
+			if k % 2 == 0:
+				var p0 := from.lerp(to, float(k) / n2)
+				var p1 := from.lerp(to, float(k + 1) / n2)
+				_imm.surface_add_vertex(Vector3(p0.x, nav.height(p0) + 0.4, p0.y))
+				_imm.surface_add_vertex(Vector3(p1.x, nav.height(p1) + 0.4, p1.y))
+		from = to
 	# A cross at the end of the route.
 	var e := path[path.size() - 1]
 	var ey := nav.height(e) + 0.4
