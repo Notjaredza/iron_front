@@ -16,6 +16,8 @@ extends Node3D
 ##   switch while it moves (see UnitCards).
 ## - Engineers (building round): a move order drops their building jobs; a right click on a building that is not
 ##   finished sends the selected engineers to build it (other squads just move there).
+## - Fighting round: a right click on an enemy squad has the selected squads attack it (they close to range and
+##   fire); a right click on a finished MG nest or gun pit sends the first selected rifle squad to man it.
 ## Orders are instant for now: the comms network (step 3) will delay them later.
 
 const PICK_PX := 22.0
@@ -28,6 +30,7 @@ const GROUP_DOUBLE_S := 0.4                    # a second press of a group's num
 var nav: NavGrid
 var cam: RtsCamera
 var build: Node                                # the BuildControl (engineers' jobs), if there is one
+var combat: Node                               # the CombatControl (attack and man-a-post orders), if there is one
 var squads: Array[Squad] = []
 var box: Panel
 var note := ""
@@ -260,6 +263,21 @@ func _right_click(at: Vector2) -> void:
 		g = _last_target
 	_last_target = g
 	var sel := selected()
+	if combat != null and not run and not sel.is_empty():
+		var foe: Variant = combat.enemy_at(g)
+		if foe != null:
+			for s in sel:
+				s.cancel_job()
+				s.attack = foe
+			say("Attack %s" % foe.title)
+			return
+	if build != null and combat != null and not run:
+		var post: Variant = build.site_at(g)
+		if post != null and post.done and post.kind in ["mg_nest", "gun_pit"]:
+			for s in sel:
+				if s.can_fire():
+					combat.man_post(s, post)
+					return
 	if build != null and not run:
 		var site: Variant = build.site_at(g)
 		if site != null and not site.done:
@@ -317,6 +335,7 @@ func _order_line(a: Vector2, b: Vector2) -> void:
 		var s: Squad = p["squad"]
 		var to: Vector2 = p["at"]
 		s.cancel_job()
+		s.attack = null
 		if not s.order_move(to, false, p["face"], p["width"]) and not s.order_move(nav.nearest_open(to), false, p["face"], p["width"]):
 			failed += 1
 	if failed > 0:
@@ -366,6 +385,7 @@ func _order(g: Vector2, run: bool, sel: Array[Squad] = selected()) -> void:
 	for i in sel.size():
 		var to := g + side * (float(i) - (sel.size() - 1) * 0.5) * SPREAD
 		sel[i].cancel_job()
+		sel[i].attack = null
 		if not sel[i].order_move(to, run, fwd) and not sel[i].order_move(g, run, fwd):
 			failed += 1
 	if failed > 0:
