@@ -10,6 +10,8 @@ extends RefCounted
 ##   archers     the host's longbows and crossbows: halt at long range and shoot; never pinned
 ##   zombies     a horde (sub-kind shambler, runner or brute): straight at the nearest men; hand to hand only;
 ##               take two hits (the brute four); never pinned
+##   officer     you (comms round): the approved officer and two guards with rifles. He does not fire; the guards
+##               do, like riflemen. When he is wounded the guards carry him (the General's carry clips).
 ## For each man there is a map from what he is doing to the clip in the kind's library:
 ##   walk, run, ready, fire, reload, fire_pinned, reload_pinned, pin_to, pinned, melee, hit, death (a list).
 ## Missing entries mean the man does not do that (a drummer does not fire).
@@ -21,6 +23,8 @@ const M := preload("res://scripts/units/anim/clips_musket.gd")
 const M2 := preload("res://scripts/units/anim/clips_redcoat2.gd")
 const MC := preload("res://scripts/units/anim/clips_medieval.gd")
 const Z := preload("res://scripts/units/anim/clips_zombie.gd")
+const O := preload("res://scripts/units/anim/clips_officer.gd")
+const G := preload("res://scripts/units/general/clips_general.gd")
 const Body := preload("res://scripts/units/anim/clips_body.gd")
 const Anim := preload("res://scripts/units/anim/anim.gd")
 
@@ -41,6 +45,8 @@ const SPEC := {
 		"supp": 0.0, "side": 1, "ammo": 0, "wound": 0.0},
 	"archers": {"range": 120.0, "acc": 0.1, "wait": [0.8, 2.0], "reload_every": 1, "melee": 0.15, "hp": 1, "reach": 5.0, "pin": "",
 		"supp": 0.06, "side": 1, "ammo": 24, "wound": 0.0},
+	"officer": {"range": 150.0, "acc": 0.14, "wait": [2.0, 4.0], "reload_every": 5, "melee": 0.35, "hp": 1, "reach": 8.0, "pin": "prone",
+		"supp": 0.07, "side": 0, "ammo": 50, "wound": 0.0},
 	"zombies": {"range": 0.0, "acc": 0.0, "wait": [0.0, 0.0], "reload_every": 1, "melee": 0.3, "hp": 2, "reach": 14.0, "pin": "",
 		"supp": 0.0, "side": 1, "ammo": 0, "wound": 0.0},
 }
@@ -66,6 +72,8 @@ static func roles(kind: String, n: int, sub := "") -> Array[String]:
 				out.append("longbow" if i % 3 != 2 else "crossbow")
 			"zombies":
 				out.append(sub if not sub.is_empty() else "shambler")
+			"officer":
+				out.append("officer" if i == 0 else "guard")
 	return out
 
 
@@ -81,12 +89,22 @@ static func make_man(kind: String, seed_value: int, role: String, lod := 1, lord
 			return m.setup(seed_value, lod, role)
 		"zombies":
 			return Zombie.new().setup(seed_value, lod, role)
+		"officer":
+			return Soldier.new().setup(seed_value, lod, "officer" if role == "officer" else "")
 	return Soldier.new().setup(seed_value, lod, role)
 
 
 ## The man's own clip names for each thing he does.
 static func clip_map(kind: String, man: Soldier) -> Dictionary:
 	match kind:
+		"officer":
+			if String(man.look.get("role", "")) == "officer":
+				return {"walk": "off_walk", "run": "off_run", "ready": "off_stand", "hit": "off_hit",
+					"death": ["off_death_back", "off_death_forward"], "carried": "off_lying"}
+			var g := clip_map("rifles", man)
+			g["carry_front"] = "guard_carry_front"
+			g["carry_rear"] = "guard_carry_rear"
+			return g
 		"rifles":
 			return {"walk": "walk", "run": "run", "ready": "ready", "fire": "fire_stand", "reload": "reload_stand",
 				"fire_pinned": "fire_prone", "reload_pinned": "reload_prone", "pin_to": "stand_to_prone", "pinned": "prone",
@@ -162,6 +180,15 @@ static func clips(kind: String) -> Dictionary:
 			out["lunge"] = _lunge()
 		"redcoats":
 			out = M.library().duplicate()
+		"officer":
+			out = clips("rifles").duplicate()
+			var fall := {"rifle": O.pistol("holster"), "hand_r": null, "hand_l": null}
+			for c: Dictionary in [_named(Body.gait(O.WALK, O.walking()), "off_walk"), _named(Body.gait(Body.RUN, O.walking()), "off_run"),
+					_hold("off_stand", O.stand()), _named(Body.hit(O.stand()), "off_hit"),
+					_named(Body.death_back(O.stand(), fall), "off_death_back"), _named(Body.death_forward(O.stand(), fall), "off_death_forward"),
+					_hold("off_lying", G.lying()), _named(G.guard_gait_carry(1.0), "guard_carry_front"),
+					_named(G.guard_gait_carry(-1.0), "guard_carry_rear")]:
+				out[c["name"]] = c
 		"medieval", "archers":
 			out = MC.library().duplicate()
 		"zombies":
@@ -207,6 +234,11 @@ static func library(kind: String, geo: UnitGeo) -> AnimationLibrary:
 		"zombies":
 			for nm: String in cl:
 				want[nm] = true
+		"officer":
+			for nm in ["walk", "run", "ready", "prone", "fire_stand", "fire_prone", "reload_stand", "reload_prone",
+					"stand_to_prone", "lunge", "hit", "death_back", "death_forward", "off_walk", "off_run", "off_stand",
+					"off_hit", "off_death_back", "off_death_forward", "off_lying", "guard_carry_front", "guard_carry_rear"]:
+				want[nm] = true
 	var al := AnimationLibrary.new()
 	for nm: String in want:
 		if cl.has(nm):
@@ -228,6 +260,13 @@ static func _role_names(kind: String, role: String) -> Array:
 			else:
 				out.append(m[k])
 	return out
+
+
+## A clip under another name (the shared hit and death clips are all called "hit", "death_back" ...).
+static func _named(c: Dictionary, nm: String) -> Dictionary:
+	var o := c.duplicate()
+	o["name"] = nm
+	return o
 
 
 static func _hold(nm: String, pose: Dictionary) -> Dictionary:

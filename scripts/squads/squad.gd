@@ -85,6 +85,11 @@ var think_t := 0.0                             # when the enemy brain last gave 
 var full := MEN                                # men when at full strength (aid posts top up to this)
 var _seed := 0
 var _lord := -1
+var carried := false                           # officer: the guards carry him (he is wounded)
+var lying := false                             # officer: wounded and lying (at the aid post, or no one to carry him)
+var comms_tag := ""                            # comms round: "order coming", "order in" on the banner
+const CARRY_V := 0.9                           # the carry clips' pace (m/s)
+const CARRY_GAP := 1.9                         # metres between the front and rear guard
 
 
 ## The walk, run and ready clips (and the engineers' work clips), baked once per kind and shared by every squad.
@@ -205,7 +210,7 @@ func _add_man(role: String, seed_value: int, where: Vector2) -> void:
 	var cm := TroopKinds.clip_map(kind, s)
 	men.append(s)
 	players.append(ap)
-	md.append({"clips": cm, "act_until": 0.0, "hp": int(spec["hp"]) * (2 if role in ARMOURED else 1),
+	md.append({"role": role, "clips": cm, "act_until": 0.0, "hp": int(spec["hp"]) * (2 if role in ARMOURED else 1),
 		"next_shot": randf() * 1.5, "shots": 0, "goal": null, "ammo": int(spec.get("ammo", 0))})
 	_clip.append("")
 	_at_work.append(false)
@@ -262,7 +267,7 @@ func _process(delta: float) -> void:
 func _step(delta: float) -> void:
 	if path.is_empty() or pinned or men.is_empty():
 		return
-	var v := (run_v if running else walk_v) * _slow(at)
+	var v := (CARRY_V if carried else (run_v if running else walk_v)) * _slow(at)
 	var left := v * delta
 	while left > 0.0 and not path.is_empty():
 		var to := path[0]
@@ -315,6 +320,8 @@ func _slow(p: Vector2) -> float:
 ## Where man i should be: at his opponent in hand to hand, in the column on the trail while moving, at his work spot
 ## when working, in ranks when halted.
 func _slot(i: int) -> Vector2:
+	if carried:
+		return _carry_slot(i)
 	var g: Variant = md[i]["goal"]
 	if g != null:
 		return g
@@ -341,6 +348,35 @@ func _slot(i: int) -> Vector2:
 	return _slot_free(i)
 
 
+## Carrying the officer: the front guard at the lead point, the rear one behind him, the officer between them.
+func _carry_slot(i: int) -> Vector2:
+	var k := carriers()
+	if i == k.x:
+		return at
+	if i == k.y:
+		return at - heading * CARRY_GAP
+	if String(md[i]["role"]) == "officer":
+		return at - heading * CARRY_GAP * 0.5
+	return at - heading * (CARRY_GAP + 2.0) + Vector2(-heading.y, heading.x) * 1.5
+
+
+## The two guards who carry (front, rear), or (-1, -1).
+func carriers() -> Vector2i:
+	var g: Array[int] = []
+	for i in md.size():
+		if String(md[i]["role"]) == "guard":
+			g.append(i)
+	return Vector2i(g[0], g[1]) if g.size() >= 2 else Vector2i(-1, -1)
+
+
+## The officer's place in the squad (-1 if he is not in it).
+func officer_index() -> int:
+	for i in md.size():
+		if String(md[i]["role"]) == "officer":
+			return i
+	return -1
+
+
 func _slot_free(i: int) -> Vector2:
 	return _slot_free_n(i, count)
 
@@ -354,6 +390,9 @@ func _slot_free_n(i: int, n: int) -> Vector2:
 
 ## Engineers: stop work and drop every job (a move order from the player does this). It also leaves a post.
 func cancel_job() -> void:
+	if has_meta("fix"):
+		remove_meta("fix")                     # comms round: also stops splicing a wire
+		stop_work()
 	jobs.clear()
 	job = null
 	stop_work()
@@ -481,8 +520,12 @@ func center() -> Vector2:
 
 func _place_men(delta: float) -> void:
 	clock += delta
-	var base_v := (run_v if running else walk_v)
+	var base_v := CARRY_V if carried else (run_v if running else walk_v)
+	var ck := carriers() if carried else Vector2i(-1, -1)
 	for i in men.size():
+		if (carried or lying) and String(md[i]["role"]) == "officer":
+			_place_carried(i, delta, ck)
+			continue
 		var goal := _slot(i)
 		var d := mpos[i].distance_to(goal)
 		var v := 0.0
@@ -518,7 +561,9 @@ func _place_men(delta: float) -> void:
 		rings[i].visible = selected and not in_post
 		if delta > 0.0 and not busy:
 			var clip := "ready"
-			if v > 2.4:
+			if carried and (i == ck.x or i == ck.y):
+				clip = "carry_front" if i == ck.x else "carry_rear"
+			elif v > 2.4:
 				clip = "run"
 			elif v > 0.25:
 				clip = "walk"
@@ -528,7 +573,8 @@ func _place_men(delta: float) -> void:
 				clip = "pinned"
 			if clip != _clip[i]:
 				_play(i, clip)
-			players[i].speed_scale = clampf(v / (run_v if clip == "run" else walk_v), 0.5, 1.6) if clip in ["walk", "run"] else 1.0
+			players[i].speed_scale = clampf(v / (run_v if clip == "run" else walk_v), 0.5, 1.6) if clip in ["walk", "run"] else (
+				clampf(v / CARRY_V, 0.0, 1.4) if clip.begins_with("carry") else 1.0)
 	if men.is_empty():
 		banner.visible = false
 		return
@@ -542,13 +588,31 @@ func _place_men(delta: float) -> void:
 		tag = "  hand to hand"
 	if out_of_ammo():
 		tag += "  OUT OF AMMO"
-	banner.text = "%s  %d%s%s%s" % [title, men.size(), ("  >>" if running else "  >") if moving() else "",
-		("  " + status) if not status.is_empty() else "", tag]
+	banner.text = "%s  %d%s%s%s%s" % [title, men.size(), ("  >>" if running else "  >") if moving() else "",
+		("  " + status) if not status.is_empty() else "", tag, ("  " + comms_tag) if not comms_tag.is_empty() else ""]
 	if side == 1:
 		banner.modulate = Color(1.0, 0.45, 0.4)
 	else:
 		banner.modulate = Color(1.0, 0.9, 0.35) if selected else Color(0.85, 0.95, 1.0)
 	_draw_route()
+
+
+## The wounded officer: lying between his carriers at their hands' height (or on the ground with none to carry him).
+func _place_carried(i: int, delta: float, ck: Vector2i) -> void:
+	var p := at - heading * CARRY_GAP * 0.5 if carried else mpos[i]
+	var lift := 0.0
+	if carried and ck.x >= 0:
+		p = (mpos[ck.x] + mpos[ck.y]) * 0.5
+		lift = 0.72
+	mpos[i] = p
+	mface[i] = _yaw(heading)
+	men[i].position = Vector3(p.x, nav.height(p) + lift, p.y)
+	men[i].rotation.y = mface[i]
+	men[i].visible = not in_post
+	rings[i].position = Vector3(p.x, nav.height(p) + 0.06, p.y)
+	rings[i].visible = selected and not in_post
+	if delta > 0.0 and not acting(i) and _clip[i] != "carried":
+		_play(i, "carried")
 
 
 func _draw_route() -> void:
