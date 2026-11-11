@@ -23,6 +23,7 @@ The user's answers:
   - The banner shows "building HQ 42%".
 - **Engineers and orders:** a move order drops their building jobs. A right click on an unfinished building sends the selected engineers back to it.
 - **Delete or X** over a building that isn't finished cancels it and opens its cells again.
+- **Delete or X over a finished building** has engineers take it down: the selected ones, or the nearest section. The stages run backwards (half built, frame, plot) in half its build time. Then it's gone, its cells open again, and walls or sandbags round it re-join. The banner shows "taking down Barracks 60%".
 - **Finished buildings:** their lights come on at night, flags and other moving parts run, and they switch to the far look from high up.
 - **Two engineer sections** (NCO and three sappers each, the approved models) now start behind the rifle squads.
 
@@ -34,7 +35,8 @@ The user's answers:
   - a wire line skips the cells it can't use;
   - engineers reach their spots outside the footprint and build the stages in order in the right time;
   - two sections build at twice the speed;
-  - auto help.
+  - auto help;
+  - taking down: stages backwards, half the time, cells open again.
   - Seeds 1-3: BUILD CHECK DONE 3 0. The squad check still passes: SQUAD CHECK DONE 3 0.
 - **Pictures:** tools/build_shots.gd (needs a screen or xvfb, see its header) saves the menu, ghosts, work, close-up, done and night pictures to results/build/ (git-ignored).
 
@@ -49,7 +51,6 @@ The user's answers:
 
 ## For later
 - Supply costs, and a "near the HQ" rule.
-- Demolishing finished buildings.
 - Rail gates where a wall crosses a track: walls on rails are refused for now.
 - Trenches, which need the ground to be dug.
 - Sandbags and wire now block walking completely; later they could slow men down or be crossable.

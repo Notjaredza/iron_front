@@ -21,6 +21,14 @@
 - They walk, run and stand like the rifles, carrying the shovel. At a building site each man takes a spot and plays his work clip, with the right tool in his hand.
 - A move order drops their building jobs. A right click on an unfinished building sends them to it. See PLACEMENT_REPORT.md.
 
+## Unit cards and control groups (2026-11-11)
+- **Unit cards** (bottom left): one card per selected squad, showing its name, how many men, and what it's doing (standing, walking, running, building HQ 42%...).
+  - The **Run/Walk** switch speeds up or slows down a squad on the move. It's greyed out while the squad stands still.
+  - Click a card's name to select only that squad.
+- **Control groups:** Ctrl+1-9 saves the selection under that number. 1-9 picks it again, and the same number twice quickly takes the camera there. Ctrl+number with nothing selected clears the group.
+  - A number with no group saved goes on to the blast test's shell-size keys, as before.
+- Check: tools/check_controls.gd (cards follow the selection; Run takes a squad to 3.7 m/s and Walk back to 1.3 m/s; groups save, pick, jump the camera and clear). CONTROLS CHECK DONE 0.
+- Files: scripts/squads/unit_cards.gd (new), squad_control.gd (groups, cards), squad.gd (set_running).
+
 ## Ideas for later
-- Run/walk toggle on the unit cards, so a moving squad can be sped up or slowed down.
 - Orders delayed by the comms network (step 3).

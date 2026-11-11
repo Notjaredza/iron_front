@@ -20,6 +20,7 @@ var node: Building
 var progress := 0.0
 var work_time := 30.0                          # seconds for a full section of four to build it
 var done := false
+var demolish := false                          # being taken down: progress runs back to 0, then it goes
 var crews: Array = []                          # the engineer squads working on it
 
 
