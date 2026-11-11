@@ -36,6 +36,10 @@ extends Node3D
 ##   sees and shoots further (15% for each level above, and from inside a building).
 ## - Fog of war: enemies are hidden until one of ours sees them (260 m by day, less at night and in fog; finished
 ##   buildings see 150 m round them). A firing enemy gives himself away within 400 m.
+## Recruitment round: each man fires by his own numbers (the LMG gunner in bursts that pin hard, the marksman far
+## and true, picking out leaders and crews); the sniper pair's spotter sees half as far again; assault sections
+## throw grenades within 30 m; mortar crews set up when halted and lob bombs at enemies we can see 60-400 m away;
+## near the officer during "hold the line" squads fire faster and cannot be pinned.
 ## Comms round: squads near the officer hit more and are pinned less (CommsControl.STEADY, CALM); when the officer
 ## himself is hit CommsControl decides (wounded first, then dead); shells cut telegraph wire; a wave whose last man
 ## falls counts as beaten off.
@@ -65,6 +69,11 @@ const BUILD_SIGHT := 150.0
 const REVEAL_S := 4.0
 const REVEAL_R := 400.0
 const AID_KINDS := ["hq", "barracks"]
+const MORTAR_SETUP := 4.0
+const MORTAR_EVERY := 8.0
+const MORTAR_MIN := 60.0
+const MORTAR_MAX := 400.0
+const MGB := preload("res://scripts/units/mg_builder.gd")
 
 var nav: NavGrid
 var data: MapData
@@ -230,6 +239,8 @@ func step(dt: float) -> void:
 	_melee()
 	_shoot()
 	_run_posts(dt)
+	_grenades()
+	_mortars(dt)
 	_resolve()
 	_suppression(dt)
 	_resupply(dt)
@@ -353,36 +364,43 @@ func _shoot() -> void:
 		if not s.can_fire() or (s.in_post and not s.post is Garrison) or s.melee_on or s.moving() or not _alive(s.target):
 			continue
 		var rng_m := eff_range(s, s.target)
-		var uses_ammo := int(s.spec.get("ammo", 0)) > 0
 		var tgt: Squad = s.target
 		var fired := 0
 		for i in s.men.size():
-			if s.acting(i) or s.clock < float(s.md[i]["next_shot"]) or not s.has_clip(i, "fire"):
+			var ms: Dictionary = s.md[i].get("spec", s.spec)
+			var burst := ms.has("burst") or String(s.md[i].get("role", "")) == "lmg_gunner"
+			if (s.acting(i) and not burst) or s.clock < float(s.md[i]["next_shot"]) or not s.has_clip(i, "fire"):
 				continue
+			var uses_ammo := int(ms.get("ammo", 0)) > 0
 			if uses_ammo and int(s.md[i].get("ammo", 0)) <= 0:
 				continue
 			var p := s.mpos[i]
-			var j := _pick_man(tgt, p, rng_m + 10.0)
+			var j := _pick_leader(tgt, p, rng_m + 10.0) if s.kind == "snipers" else _pick_man(tgt, p, rng_m + 10.0)
 			if j < 0:
 				continue
 			var what := "fire_pinned" if s.pinned and s.has_clip(i, "fire_pinned") else "fire"
 			var when := s.hit_moment(i, what)
-			var L := s.act(i, what)
+			var L := 0.0
+			if burst:
+				when = 0.0                         # the LMG: round after round from the bipod, no bolt to work
+			else:
+				L = s.act(i, what)
 			s.md[i]["shots"] = int(s.md[i]["shots"]) + 1
 			if uses_ammo:
 				s.md[i]["ammo"] = int(s.md[i]["ammo"]) - 1
 			if s.side == 1:
 				_fired[s] = t
 			var reload := 0.0
-			if int(s.md[i]["shots"]) % int(s.spec["reload_every"]) == 0 and s.has_clip(i, "reload"):
+			if int(s.md[i]["shots"]) % int(ms["reload_every"]) == 0 and s.has_clip(i, "reload"):
 				reload = s.clip_len(s.clip_for(i, "reload_pinned" if s.pinned and s.has_clip(i, "reload_pinned") else "reload"))
-			var w: Array = s.spec["wait"]
-			s.md[i]["next_shot"] = s.clock + L + reload + rng.randf_range(float(w[0]), float(w[1]))
+			var w: Array = ms["wait"]
+			var quick := 0.6 if holding(s) else 1.0  # "hold the line": faster fire near the officer
+			s.md[i]["next_shot"] = s.clock + L + reload + rng.randf_range(float(w[0]), float(w[1])) * quick
 			if reload > 0.0:
 				s.md[i]["reload_at"] = s.clock + L
 			var flight := 1.1 if s.kind == "archers" else 0.0
 			_pending.append({"t": t + when + flight, "kind": "shot", "from": s, "man": s.men[i], "to": tgt, "victim": tgt.men[j],
-				"fx_t": t + when})
+				"fx_t": t + when, "ms": ms})
 			fired += 1
 		if fired > 0 and s.kind == "redcoats":
 			# volleys fired: the musketeers' shots, on average
@@ -398,6 +416,14 @@ func _shoot() -> void:
 			if s.md[i].has("reload_at") and s.clock >= float(s.md[i]["reload_at"]):
 				s.md[i].erase("reload_at")
 				s.act(i, "reload_pinned" if s.pinned and s.has_clip(i, "reload_pinned") else "reload")
+
+
+## The marksman's pick: a leader or a crewman in reach (an officer, NCO, banner, gunner ...), else anyone.
+func _pick_leader(tgt: Squad, p: Vector2, max_d: float) -> int:
+	for j in tgt.men.size():
+		if String(tgt.md[j].get("role", "")) in TroopKinds.LEADERS and tgt.mpos[j].distance_to(p) <= max_d:
+			return j
+	return _pick_man(tgt, p, max_d)
 
 
 ## A man of squad tgt for a shooter at p to aim at (the nearest few, picked at random), or -1.
@@ -431,10 +457,11 @@ func cover_at(s: Squad, p: Vector2) -> float:
 	return c
 
 
-func hit_chance(from: Squad, to: Squad, d: float, at: Vector2) -> float:
-	var r := float(from.spec["range"])
+func hit_chance(from: Squad, to: Squad, d: float, at: Vector2, ms: Dictionary = {}) -> float:
+	var sp: Dictionary = ms if not ms.is_empty() else from.spec
+	var r := float(sp["range"])
 	var fall := clampf(1.0 - 0.75 * clampf((d / r - 0.25) / 0.75, 0.0, 1.0), 0.25, 1.0)
-	var p := float(from.spec["acc"]) * fall * cover_at(to, at)
+	var p := float(sp["acc"]) * fall * cover_at(to, at)
 	if from.pinned:
 		p *= 0.4
 	if to.moving() and to.running:
@@ -464,13 +491,14 @@ func _resolve() -> void:
 				var from: Squad = e["from"]
 				if not is_instance_valid(to) or not is_instance_valid(from):
 					continue
-				to.supp += float(from.spec["supp"]) * _calm(to)
+				var ms: Dictionary = e.get("ms", from.spec)
+				to.supp += float(ms["supp"]) * _calm(to)
 				var j := to.index_of(e["victim"])
 				if j < 0:
 					continue
 				var d := from.center().distance_to(to.mpos[j])
 				stats["shots"][from.side] += 1
-				if rng.randf() < hit_chance(from, to, d, to.mpos[j]) * float(from.spec["range"]) / maxf(eff_range(from, to), 1.0):
+				if rng.randf() < hit_chance(from, to, d, to.mpos[j], ms) * float(from.spec["range"]) / maxf(eff_range(from, to), 1.0):
 					to.supp += 0.12 * _calm(to)
 					stats["hits"][from.side] += 1
 					wound(to, j)
@@ -487,6 +515,10 @@ func _resolve() -> void:
 				if rng.randf() < float(from2.spec["melee"]):
 					stats["kills"][from2.side] += 1
 					wound(to2, j2)
+			"grenade":
+				grenade(e["at"])
+			"bomb":
+				shell(e["at"])
 	_pending = keep
 
 
@@ -586,7 +618,7 @@ func _melee() -> void:
 func _suppression(dt: float) -> void:
 	for s in ours() + enemies:
 		s.supp = maxf(0.0, s.supp - SUPP_DECAY * dt)
-		if String(s.spec["pin"]).is_empty() or s.in_post:
+		if String(s.spec["pin"]).is_empty() or s.in_post or holding(s):
 			s.supp = minf(s.supp, 0.9)
 			s.pinned = false
 			continue
@@ -723,6 +755,139 @@ func _run_posts(dt: float) -> void:
 			shell(aim2)
 
 
+## "Hold the line" is on for this squad (near the officer while it lasts).
+func holding(s: Squad) -> bool:
+	return comms != null and s.side == 0 and comms.has_method("hold_on") and comms.hold_on() and comms.near_officer(s)
+
+
+## Assault sections close in with grenades: when an enemy is within 30 m, one man throws (every 8 s or so, while
+## the bag lasts: three a man). It bursts 2.1 s later where the enemy was: deadly within 3 m, dangerous to 7 m.
+func _grenades() -> void:
+	for s in ours():
+		if not s.spec.has("grenades") or s.men.is_empty() or s.moving() or s.in_post:
+			continue
+		if t < float(s.get_meta("next_grenade", 0.0)):
+			continue
+		var foe := _nearest_foe(s, 32.0)
+		if foe == null or (foe.side == 1 and not seen.has(foe)):
+			continue
+		var c := s.center()
+		var best := -1
+		var bd := INF
+		for i in s.men.size():
+			if s.acting(i) or not s.has_clip(i, "throw") or int(s.md[i].get("grenades", s.spec["grenades"])) <= 0:
+				continue
+			var d := s.mpos[i].distance_to(foe.center())
+			if d < bd and d > 6.0:
+				bd = d
+				best = i
+		if best < 0 or bd > 32.0:
+			continue
+		s.md[best]["grenades"] = int(s.md[best].get("grenades", s.spec["grenades"])) - 1
+		s.act(best, "throw")
+		s.set_meta("next_grenade", t + rng.randf_range(6.0, 10.0))
+		var aim := foe.mpos[rng.randi() % foe.mpos.size()] + Vector2(rng.randf_range(-2.5, 2.5), rng.randf_range(-2.5, 2.5))
+		_pending.append({"t": t + 2.1, "kind": "grenade", "at": aim, "from": s})
+		stats["grenades"] = int(stats.get("grenades", 0)) + 1
+
+
+## A grenade bursts at p.
+func grenade(p: Vector2) -> void:
+	if blasts != null:
+		blasts.fire(1, p.x, p.y)
+	if comms != null:
+		comms.blast_at(p)
+	for s in ours() + enemies:
+		if s.men.is_empty() or s.center().distance_to(p) > 30.0:
+			continue
+		var j := s.men.size() - 1
+		while j >= 0:
+			var d := s.mpos[j].distance_to(p)
+			var kill_p := 0.6 if d < 3.0 else (0.25 if d < 7.0 else 0.0)
+			if rng.randf() < kill_p * (0.4 if cover_at(s, s.mpos[j]) < 0.5 else 1.0):
+				s.md[j]["hp"] = 1
+				wound(s, j)
+			j -= 1
+		if s.center().distance_to(p) < 12.0:
+			s.supp += 0.8
+
+
+## Mortar crews: halted 4 s, they set up (the mortar on its plate shows); set up, they lob a bomb every 8 s at the
+## nearest enemy band we can see 60-400 m off (sight from any of ours: they need no line of sight themselves).
+## Bombs land within about 12 m of the aim and burst like a small shell. Each man carries 10 bombs.
+func _mortars(dt: float) -> void:
+	for s in ours():
+		if not s.spec.has("bombs") or s.men.is_empty():
+			continue
+		if s.moving() or s.in_post:
+			s.set_meta("still", 0.0)
+			_set_mortar(s, false)
+			continue
+		var still := float(s.get_meta("still", 0.0)) + dt
+		s.set_meta("still", still)
+		if still < MORTAR_SETUP:
+			continue
+		_set_mortar(s, true)
+		if t < float(s.get_meta("next_bomb", 0.0)):
+			continue
+		var c := s.center()
+		var best: Squad = null
+		var bd := MORTAR_MAX
+		for e in enemies:
+			if e.men.is_empty() or not seen.has(e):
+				continue
+			var d := c.distance_to(e.center())
+			if d < bd and d > MORTAR_MIN:
+				bd = d
+				best = e
+		if best == null:
+			continue
+		var who := -1
+		for i in s.men.size():
+			if int(s.md[i].get("ammo", 0)) > 0:
+				who = i
+				break
+		if who < 0:
+			continue
+		s.md[who]["ammo"] = int(s.md[who]["ammo"]) - 1
+		s.set_meta("next_bomb", t + MORTAR_EVERY)
+		var scatter := 4.0 + bd * 0.02
+		var aim := best.center() + Vector2(rng.randf_range(-1, 1), rng.randf_range(-1, 1)) * scatter
+		var gun: Node3D = s.get_meta("mortar_node") if s.has_meta("mortar_node") else null
+		if gun != null:
+			var top := gun.global_position + Vector3(0, 0.9, 0)
+			fx.glow.add("spark", top, Vector3(0, 8, 0), 0.6)
+			fx.trail(top, Vector3(0, 6, 0), 0.6)
+		_pending.append({"t": t + 2.0 + bd / 150.0, "kind": "bomb", "at": aim, "from": s})
+		stats["bombs"] = int(stats.get("bombs", 0)) + 1
+
+
+## Shows or hides a crew's mortar (the plate and tube, the approved kit) in front of its tube man.
+func _set_mortar(s: Squad, on: bool) -> void:
+	if s.deployed == on:
+		return
+	s.deployed = on
+	var gun: Node3D = s.get_meta("mortar_node") if s.has_meta("mortar_node") else null
+	if gun == null:
+		gun = Node3D.new()
+		var plate := MeshInstance3D.new()
+		plate.mesh = MGB.mesh(TroopKit.plate(1))
+		plate.material_override = Soldier.material()
+		gun.add_child(plate)
+		var tube := MeshInstance3D.new()
+		tube.mesh = MGB.mesh(TroopKit.tube(1.0, 1))
+		tube.material_override = Soldier.material()
+		tube.transform = TroopKit.tube_xf()
+		gun.add_child(tube)
+		s.add_child(gun)
+		s.set_meta("mortar_node", gun)
+	gun.visible = on
+	if on:
+		var p := s.at + s.heading * 1.2
+		gun.position = Vector3(p.x, nav.height(p), p.y)
+		gun.rotation.y = atan2(-s.heading.x, -s.heading.y)
+
+
 ## A shell bursts at p: men near it fall, and everyone round about is shaken.
 func shell(p: Vector2) -> void:
 	if blasts != null:
@@ -769,23 +934,24 @@ func post_ammo(site: BuildSite) -> float:
 ## Our squads near a finished depot or HQ fill their pouches.
 func _resupply(dt: float) -> void:
 	for s in ours():
-		var most := int(s.spec.get("ammo", 0))
-		if most <= 0 or s.ammo_frac() >= 1.0 or _near_kind(s.center(), ["depot", "hq"], RESUPPLY_R) == null:
+		if s.ammo_frac() >= 1.0 or _near_kind(s.center(), ["depot", "hq"], RESUPPLY_R) == null:
 			continue
 		var acc := float(s.get_meta("supply_acc", 0.0)) + dt * RESUPPLY_RATE
 		var whole := int(acc)
 		s.set_meta("supply_acc", acc - whole)
-		for d in s.md:
-			d["ammo"] = mini(most, int(d.get("ammo", 0)) + whole)
+		for i in s.md.size():
+			var most := s.ammo_max(i)
+			var d: Dictionary = s.md[i]
+			d["ammo"] = mini(most, int(d.get("ammo", 0)) + whole * maxi(1, most / 50))
 
 
 ## The wounded: down a while, then up and walking to the nearest aid post, then healing; the healed top up squads.
 func _run_wounded(dt: float) -> void:
 	var keep: Array[Dictionary] = []
 	for w in wounded:
+		if not is_instance_valid(w["body"]):
+			continue                           # (his body was cleared away)
 		var body: Soldier = w["body"]
-		if not is_instance_valid(body):
-			continue
 		if w["state"] == "down":
 			if t - float(w["t"]) < DOWN_S:
 				keep.append(w)
@@ -953,7 +1119,7 @@ func _fog() -> void:
 				if s.men.is_empty():
 					continue
 				var d := s.center().distance_to(ec)
-				var r := sr * (1.0 + 0.15 * clampf((eye(s) - eye(e)) / 8.0, 0.0, 2.0))
+				var r := sr * float(s.spec.get("sight", 1.0)) * (1.0 + 0.15 * clampf((eye(s) - eye(e)) / 8.0, 0.0, 2.0))
 				if d < r and clear_sight(s.center(), eye(s), ec, eye(e) + 0.4):
 					spotted = true
 					break
