@@ -9,6 +9,8 @@ extends Node3D
 ##   on screen they face away from the camera; drawn the other way they face it). A long line makes a wide, shallow
 ##   formation; a short one a narrow, deep one. A preview of every man's place shows while dragging. Always a walk.
 ## - H brings the camera to the selected squads (or the first squad).
+## - Engineers (building round): a move order drops their building jobs; a right click on a building that is not
+##   finished sends the selected engineers to build it (other squads just move there).
 ## Orders are instant for now: the comms network (step 3) will delay them later.
 
 const PICK_PX := 22.0
@@ -19,6 +21,7 @@ const LINE_PX := 12.0                          # a right drag shorter than this 
 
 var nav: NavGrid
 var cam: RtsCamera
+var build: Node                                # the BuildControl (engineers' jobs), if there is one
 var squads: Array[Squad] = []
 var box: Panel
 var note := ""
@@ -55,8 +58,9 @@ func _ready() -> void:
 	add_child(_preview)
 
 
-## Clears the old squads and puts new ones round a point (metres), facing north.
-func spawn(nav_grid: NavGrid, around: Vector2, count := 3) -> void:
+## Clears the old squads and puts new ones round a point (metres), facing north: the rifle squads in front, the
+## engineer sections behind them.
+func spawn(nav_grid: NavGrid, around: Vector2, count := 3, engineers := 2) -> void:
 	nav = nav_grid
 	for s in squads:
 		s.queue_free()
@@ -67,6 +71,20 @@ func spawn(nav_grid: NavGrid, around: Vector2, count := 3) -> void:
 		add_child(s)
 		s.setup(nav, where, Vector2(0, -1), 7 + k, "Rifles %d" % (k + 1))
 		squads.append(s)
+	for k in engineers:
+		var where := nav.nearest_open(around + Vector2((float(k) - (engineers - 1) * 0.5) * SPREAD, 22.0))
+		var s := Squad.new()
+		add_child(s)
+		s.setup(nav, where, Vector2(0, -1), 41 + k, "Engineers %d" % (k + 1), "engineers")
+		squads.append(s)
+
+
+func selected_engineers() -> Array[Squad]:
+	var out: Array[Squad] = []
+	for s in selected():
+		if s.is_engineers():
+			out.append(s)
+	return out
 
 
 func selected() -> Array[Squad]:
@@ -78,7 +96,7 @@ func selected() -> Array[Squad]:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if nav == null:
+	if nav == null or (build != null and build.busy()):
 		return
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
@@ -182,7 +200,18 @@ func _right_click(at: Vector2) -> void:
 	if run:
 		g = _last_target
 	_last_target = g
-	_order(g, run)
+	var sel := selected()
+	if build != null and not run:
+		var site: Variant = build.site_at(g)
+		if site != null and not site.done:
+			var rest: Array[Squad] = []
+			for s in sel:
+				if s.is_engineers():
+					build.assign(s, site, true)
+				else:
+					rest.append(s)
+			sel = rest
+	_order(g, run, sel)
 
 
 func _ground2(mp: Vector2) -> Variant:
@@ -192,6 +221,7 @@ func _ground2(mp: Vector2) -> Variant:
 
 ## Plans a drawn line from a to b (metres) for the given squads: one solid line of men. Returns one
 ## {"squad", "at", "face", "width"} per squad, left to right. Shared by the preview, the order and the check.
+## Squads of different sizes each take their own share: a squad never stands wider than it has men.
 static func plan_line(sel: Array[Squad], a: Vector2, b: Vector2) -> Array:
 	var out := []
 	var n := sel.size()
@@ -202,13 +232,22 @@ static func plan_line(sel: Array[Squad], a: Vector2, b: Vector2) -> Array:
 	# How many men wide the whole line is, shared out evenly between the squads.
 	var cols := int(round(a.distance_to(b) / Squad.LINE_GAP)) + 1
 	var width := clampi(int(round(float(cols) / n)), Squad.MIN_FILES, Squad.MEN)
-	var span := width * Squad.LINE_GAP          # each squad's share of the line, so the gaps match the men's
 	var mid := (a + b) * 0.5
 	var order := sel.duplicate()
 	order.sort_custom(func(p: Squad, q: Squad) -> bool: return p.at.dot(dir) < q.at.dot(dir))
+	# Each squad's share of the line is its width in men, so the gaps between squads match the men's.
+	var widths: Array[int] = []
+	var total := 0.0
+	for sq: Squad in order:
+		var wi := clampi(width, mini(Squad.MIN_FILES, sq.count), sq.count)
+		widths.append(wi)
+		total += wi * Squad.LINE_GAP
+	var along := -total * 0.5
 	for i in n:
-		var c := mid + dir * (float(i) - (n - 1) * 0.5) * span
-		out.append({"squad": order[i], "at": c + face * 1.0, "face": face, "width": width})
+		var span := widths[i] * Squad.LINE_GAP
+		var c := mid + dir * (along + span * 0.5)
+		along += span
+		out.append({"squad": order[i], "at": c + face * 1.0, "face": face, "width": widths[i], "count": order[i].count})
 	return out
 
 
@@ -218,6 +257,7 @@ func _order_line(a: Vector2, b: Vector2) -> void:
 	for p: Dictionary in plan_line(selected(), a, b):
 		var s: Squad = p["squad"]
 		var to: Vector2 = p["at"]
+		s.cancel_job()
 		if not s.order_move(to, false, p["face"], p["width"]) and not s.order_move(nav.nearest_open(to), false, p["face"], p["width"]):
 			failed += 1
 	if failed > 0:
@@ -234,8 +274,8 @@ func _draw_preview(plan: Array) -> void:
 		var at: Vector2 = p["at"]
 		var f: Vector2 = p["face"]
 		var right := Vector2(-f.y, f.x)
-		for i in Squad.MEN:
-			var o := Squad.free_offset(i, p["width"])
+		for i in int(p["count"]):
+			var o := Squad.free_offset(i, p["width"], p["count"])
 			var q := at + right * o.x - f * o.y
 			_seg(q - right * 0.4, q + right * 0.4)
 			_seg(q, q + f * 0.7)
@@ -251,9 +291,8 @@ func _seg(p: Vector2, q: Vector2) -> void:
 	_pimm.surface_add_vertex(Vector3(q.x, nav.height(q) + 0.3, q.y))
 
 
-## Sends the selected squads to g, side by side across the way they are going.
-func _order(g: Vector2, run: bool) -> void:
-	var sel := selected()
+## Sends the squads (the selected ones unless given) to g, side by side across the way they are going.
+func _order(g: Vector2, run: bool, sel: Array[Squad] = selected()) -> void:
 	if sel.is_empty():
 		return
 	var c := Vector2.ZERO
@@ -267,6 +306,7 @@ func _order(g: Vector2, run: bool) -> void:
 	var failed := 0
 	for i in sel.size():
 		var to := g + side * (float(i) - (sel.size() - 1) * 0.5) * SPREAD
+		sel[i].cancel_job()
 		if not sel[i].order_move(to, run, fwd) and not sel[i].order_move(g, run, fwd):
 			failed += 1
 	if failed > 0:

@@ -16,6 +16,11 @@
 - Check: tools/check_squads.gd step 5 (long, medium and short lines, drawn both ways): everyone in place, facing right, front rank on the line, one solid evenly spaced line. Run on seeds 1-3: SQUAD CHECK DONE 3 0.
 - Files: scripts/squads/squad.gd (width and facing on arrival), scripts/squads/squad_control.gd (drag, preview, plan_line).
 
+## Building round: engineer sections (2026-11-11)
+- Squads can now be engineer sections (NCO and three sappers, the approved models). Two start behind the rifle squads.
+- They walk, run and stand like the rifles, carrying the shovel. At a building site each man takes a spot and plays his work clip, with the right tool in his hand.
+- A move order drops their building jobs. A right click on an unfinished building sends them to it. See PLACEMENT_REPORT.md.
+
 ## Ideas for later
 - Run/walk toggle on the unit cards, so a moving squad can be sped up or slowed down.
 - Orders delayed by the comms network (step 3).

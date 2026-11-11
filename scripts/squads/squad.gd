@@ -1,13 +1,17 @@
 class_name Squad
 extends Node3D
-## Iron Front: a 12-man rifle squad on the map (squads round 1: select and move; no fighting yet).
+## Iron Front: a squad on the map: a 12-man rifle squad, or a 4-man engineer section (NCO and three sappers) that
+## builds (squads round 1: select and move; no fighting yet; building round: engineers).
 ## - The squad has one route. Its lead point walks the route, and drops a trail of breadcrumbs behind it.
 ## - On the move the men walk two abreast in a column down the trail, so they follow it round cliffs and up ramps.
 ## - When the squad stops they form ranks `files` men wide (two ranks of six unless a drawn line says otherwise),
 ##   facing the way the order said (or the way they were going).
-## - Each man plays the shared walk, run or ready clip (baked once from the animation library).
+## - Each man plays the shared walk, run or ready clip (baked once per kind from the animation library).
+## - Work (engineers): BuildControl gives the squad work spots; once halted each man walks to his spot, faces the
+##   work and plays his work clip (hammer, saw, shovel, maul...). men_at_work() says how many are working.
 
 const R := preload("res://scripts/units/anim/clips_rifle.gd")
+const E := preload("res://scripts/units/anim/clips_engineer.gd")
 const Body := preload("res://scripts/units/anim/clips_body.gd")
 const Anim := preload("res://scripts/units/anim/anim.gd")
 const MEN := 12
@@ -20,10 +24,24 @@ const LINE_DEPTH := 2.5
 const CRUMB := 0.5                             # trail spacing (m)
 const MIN_FILES := 3                           # narrowest line: 3 men wide, 4 ranks deep
 
-static var _lib: AnimationLibrary
+static var _libs: Dictionary = {}              # kind -> AnimationLibrary
+static var _eng_clips: Dictionary = {}         # engineer clip name -> clip (for the tool each clip holds)
+## The clips an engineer can work with (baked into the engineers' library).
+const WORK_CLIPS := ["eng_hammer", "eng_hammer_low", "eng_saw", "eng_shovel", "eng_pick", "eng_drive", "eng_hold",
+	"eng_nco_check"]
 
 var nav: NavGrid
 var title := "Rifles"
+var kind := "rifles"                           # "rifles" or "engineers"
+var count := MEN                               # men in the squad
+var status := ""                               # a word for the banner (engineers: what they are building)
+var jobs: Array = []                           # engineers: build sites to do, in order (BuildControl owns them)
+var job: Variant = null                        # engineers: the site being built now
+var working := false                           # at the site: men go to work_spots and play work_clip
+var work_spots: Array[Vector2] = []
+var work_face: Array[Vector2] = []
+var work_clip: Array[String] = []
+var _at_work: Array[bool] = []
 var men: Array[Soldier] = []
 var players: Array[AnimationPlayer] = []
 var rings: Array[MeshInstance3D] = []
@@ -43,35 +61,61 @@ var _imm: ImmediateMesh
 var _clip: Array[String] = []
 
 
-## The walk, run and ready clips, baked once and shared by every squad.
-static func library(geo: UnitGeo) -> AnimationLibrary:
-	if _lib == null:
-		_lib = AnimationLibrary.new()
+## The walk, run and ready clips (and the engineers' work clips), baked once per kind and shared by every squad.
+static func library(geo: UnitGeo, of_kind := "rifles") -> AnimationLibrary:
+	if _libs.has(of_kind):
+		return _libs[of_kind]
+	var al := AnimationLibrary.new()
+	if of_kind == "engineers":
+		var el := E.library()
+		_eng_clips = el.duplicate()
+		var run := Body.gait(Body.RUN, E.carry("shovel"))
+		run["props"] = {"hand": [[0.0, "shovel"]]}
+		_eng_clips["walk"] = el["eng_walk"]
+		_eng_clips["run"] = run
+		_eng_clips["ready"] = el["eng_hold_stand"]
+		for nm: String in ["walk", "run", "ready"]:
+			al.add_animation(nm, Anim.bake(_eng_clips[nm], geo))
+		for nm: String in WORK_CLIPS:
+			al.add_animation(nm, Anim.bake(el[nm], geo))
+	else:
 		var lib := R.library()
-		_lib.add_animation("walk", Anim.bake(lib["walk"], geo))
-		_lib.add_animation("run", Anim.bake(lib["run"], geo))
+		al.add_animation("walk", Anim.bake(lib["walk"], geo))
+		al.add_animation("run", Anim.bake(lib["run"], geo))
 		var ready_pose: Dictionary = R.poses()["ready"]
-		_lib.add_animation("ready", Anim.bake({"name": "ready", "len": 1.0, "loop": true, "keys": [[0.0, ready_pose], [1.0, ready_pose]]}, geo))
-	return _lib
+		al.add_animation("ready", Anim.bake({"name": "ready", "len": 1.0, "loop": true, "keys": [[0.0, ready_pose], [1.0, ready_pose]]}, geo))
+	_libs[of_kind] = al
+	return al
 
 
-func setup(nav_grid: NavGrid, where: Vector2, face: Vector2, seed_value: int, name_text: String) -> Squad:
+func setup(nav_grid: NavGrid, where: Vector2, face: Vector2, seed_value: int, name_text: String, of_kind := "rifles") -> Squad:
 	nav = nav_grid
 	title = name_text
+	kind = of_kind
+	count = 4 if kind == "engineers" else MEN
+	files = count if kind == "engineers" else 6
 	at = nav.nearest_open(where)
 	heading = face.normalized()
-	for i in MEN:
-		var s := Soldier.new()
-		add_child(s)
-		s.setup(seed_value * 100 + i, 1)
+	for i in count:
+		var s: Soldier
+		if kind == "engineers":
+			s = Engineer.new()
+			add_child(s)
+			s.setup(seed_value * 100 + i, 1, "nco" if i == 0 else "sapper")
+		else:
+			s = Soldier.new()
+			add_child(s)
+			s.setup(seed_value * 100 + i, 1)
 		var ap := AnimationPlayer.new()
 		s.add_child(ap)
-		ap.add_animation_library("", library(s.geo))
+		ap.add_animation_library("", library(s.geo, kind))
 		ap.play("ready")
 		ap.seek(randf() * 0.9, true)
 		men.append(s)
 		players.append(ap)
 		_clip.append("ready")
+		_at_work.append(false)
+		_props(i, "ready")
 		var ring := MeshInstance3D.new()
 		var tm := TorusMesh.new()
 		tm.inner_radius = 0.42
@@ -128,7 +172,7 @@ func order_move(to: Vector2, run := false, face := Vector2.ZERO, width := 0) -> 
 		return false
 	face_goal = face.normalized() if face.length() > 0.001 else Vector2.ZERO
 	if width > 0:
-		files = clampi(width, MIN_FILES, MEN)
+		files = clampi(width, mini(MIN_FILES, count), count)
 	if at.distance_to(to) < 0.3:
 		_arrive()                                  # already there: just turn and re-form
 		return true
@@ -176,7 +220,7 @@ func _step(delta: float) -> void:
 				_arrive()
 		if trail.is_empty() or trail[0].distance_to(at) >= CRUMB:
 			trail.push_front(at)
-	var keep := int((MEN / 2 + 2) * COL_GAP / CRUMB) + 4
+	var keep := int((count / 2 + 2) * COL_GAP / CRUMB) + 4
 	if trail.size() > keep:
 		trail.resize(keep)
 
@@ -187,16 +231,16 @@ func _arrive() -> void:
 		heading = face_goal
 
 
-## Halted ranks for a squad `width` men wide: [ranks, men in the last rank].
-static func ranks_for(width: int) -> Vector2i:
-	var r := ceili(float(MEN) / width)
-	return Vector2i(r, MEN - (r - 1) * width)
+## Halted ranks for a squad of n men `width` wide: [ranks, men in the last rank].
+static func ranks_for(width: int, n := MEN) -> Vector2i:
+	var r := ceili(float(n) / width)
+	return Vector2i(r, n - (r - 1) * width)
 
 
 ## Where man i stands when halted, relative to the lead point: x across (right +), y back (+). Static so the
 ## drag preview can draw the same places before the order is given.
-static func free_offset(i: int, width: int) -> Vector2:
-	var rf := ranks_for(width)
+static func free_offset(i: int, width: int, n := MEN) -> Vector2:
+	var rf := ranks_for(width, n)
 	var rank := i / width
 	var file := i % width
 	var in_rank := width if rank < rf.x - 1 else rf.y   # the last rank may be short: keep it centred
@@ -207,8 +251,10 @@ func _slow(p: Vector2) -> float:
 	return 1.0 / nav.astar.get_point_weight_scale(nav.cell_of(p))
 
 
-## Where man i should be: in the column on the trail while moving, in two ranks when halted.
+## Where man i should be: in the column on the trail while moving, at his work spot when working, in ranks when halted.
 func _slot(i: int) -> Vector2:
+	if not moving() and working and i < work_spots.size():
+		return work_spots[i]
 	if moving():
 		var rank := i / 2
 		var side := -COL_SIDE if i % 2 == 0 else COL_SIDE
@@ -229,10 +275,53 @@ func _slot(i: int) -> Vector2:
 
 
 func _slot_free(i: int) -> Vector2:
-	var o := free_offset(i, files)
+	var o := free_offset(i, files, count)
 	var right := Vector2(-heading.y, heading.x)
 	var q := at + right * o.x - heading * o.y
 	return q if _same_ground(q, at) else at - heading * float(i) * 0.6
+
+
+## Engineers: stop work and drop every job (a move order from the player does this).
+func cancel_job() -> void:
+	jobs.clear()
+	job = null
+	stop_work()
+
+
+func stop_work() -> void:
+	working = false
+	work_spots.clear()
+	work_face.clear()
+	work_clip.clear()
+	status = ""
+
+
+## Starts work: one spot, facing and clip per man (fewer spots than men: the rest wait in ranks).
+func start_work(spots: Array[Vector2], faces: Array[Vector2], clips: Array[String]) -> void:
+	working = true
+	work_spots = spots
+	work_face = faces
+	work_clip = clips
+
+
+## How many men are at their spot and working.
+func men_at_work() -> int:
+	var n := 0
+	for i in _at_work.size():
+		if _at_work[i]:
+			n += 1
+	return n
+
+
+func is_engineers() -> bool:
+	return kind == "engineers"
+
+
+## The tool in an engineer's hand follows the clip he plays.
+func _props(i: int, clip: String) -> void:
+	if kind != "engineers" or not _eng_clips.has(clip):
+		return
+	(men[i] as Engineer).set_props(Engineer.prop_state(_eng_clips[clip], 0.0))
 
 
 func _same_ground(q: Vector2, p: Vector2) -> bool:
@@ -245,6 +334,10 @@ func _place_men(delta: float) -> void:
 		var goal := _slot(i)
 		var d := mpos[i].distance_to(goal)
 		var v := 0.0
+		var at_spot := working and not moving() and i < work_spots.size() and d <= 0.3
+		_at_work[i] = at_spot
+		if at_spot:
+			mface[i] = lerp_angle(mface[i], _yaw(work_face[i]), 1.0 - exp(-delta * 6.0)) if delta > 0.0 else _yaw(work_face[i])
 		if d > 0.05 and delta > 0.0:
 			# Men behind their place hurry a little; men close to it ease in.
 			var want := base_v * _slow(mpos[i]) * clampf(d / 1.5, 0.3, 1.35)
@@ -254,8 +347,9 @@ func _place_men(delta: float) -> void:
 			var dir := (goal - mpos[i]) / d
 			mpos[i] += dir * s
 			v = s / delta
-			mface[i] = lerp_angle(mface[i], _yaw(dir), 1.0 - exp(-delta * 8.0))
-		elif not moving():
+			if not at_spot:
+				mface[i] = lerp_angle(mface[i], _yaw(dir), 1.0 - exp(-delta * 8.0))
+		elif not moving() and not at_spot:
 			mface[i] = lerp_angle(mface[i], _yaw(heading), 1.0 - exp(-delta * 4.0))
 		var p := mpos[i]
 		var y := nav.height(p)
@@ -269,12 +363,15 @@ func _place_men(delta: float) -> void:
 				clip = "run"
 			elif v > 0.25:
 				clip = "walk"
+			elif at_spot and i < work_clip.size():
+				clip = work_clip[i]
 			if clip != _clip[i]:
 				_clip[i] = clip
 				players[i].play(clip, 0.25)
-			players[i].speed_scale = clampf(v / (RUN_V if clip == "run" else WALK_V), 0.5, 1.6) if clip != "ready" else 1.0
+				_props(i, clip)
+			players[i].speed_scale = clampf(v / (RUN_V if clip == "run" else WALK_V), 0.5, 1.6) if clip in ["walk", "run"] else 1.0
 	banner.position = Vector3(at.x, nav.height(at) + 4.0, at.y)
-	banner.text = "%s  %d%s" % [title, men.size(), ("  >>" if running else "  >") if moving() else ""]
+	banner.text = "%s  %d%s%s" % [title, men.size(), ("  >>" if running else "  >") if moving() else "", ("  " + status) if not status.is_empty() else ""]
 	banner.modulate = Color(1.0, 0.9, 0.35) if selected else Color(0.85, 0.95, 1.0)
 	_draw_route()
 

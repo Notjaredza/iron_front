@@ -9,6 +9,7 @@ extends RefCounted
 ##   under a ramp follows its slope (height()).
 ## The search itself is Godot's AStarGrid2D (fast, in the engine), with eight directions and no corner cutting.
 ## Paths are then pulled straight where the ground between two points is clear.
+## Buildings close the cells they stand on (set_blocked).
 
 const SLOW := 1.7                              # streams, fords, marsh
 const WOOD := 1.25                             # woods and tall grass
@@ -18,6 +19,7 @@ var astar := AStarGrid2D.new()
 var open := PackedByteArray()                  # w * h: 1 where a man can stand
 var ramp_at := {}                              # cell index -> ramp index, for cells the ramp surface covers
 var build_ms := 0
+var blocked := {}                              # cell index -> what open[] was before a building closed it
 
 
 func build(d: MapData) -> NavGrid:
@@ -79,6 +81,24 @@ func build(d: MapData) -> NavGrid:
 				astar.set_point_weight_scale(Vector2i(x, z), WOOD)
 	build_ms = Time.get_ticks_msec() - t0
 	return self
+
+
+## Buildings (building round): closes a cell to walkers, or opens it again (only if the map lets men stand there).
+func set_blocked(c: Vector2i, on: bool) -> void:
+	var i := c.y * data.w + c.x
+	if on:
+		if not blocked.has(i):
+			blocked[i] = open[i]
+		open[i] = 0
+		astar.set_point_solid(c, true)
+	elif blocked.has(i):
+		open[i] = blocked[i]
+		blocked.erase(i)
+		astar.set_point_solid(c, open[i] == 0)
+
+
+func is_blocked(c: Vector2i) -> bool:
+	return blocked.has(c.y * data.w + c.x)
 
 
 func _ramp_cell(r: Dictionary, along: int, across: int) -> int:
