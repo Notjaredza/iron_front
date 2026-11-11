@@ -5,6 +5,10 @@ extends SceneTree
 ##    found, never crosses a closed cell, and never jumps in height (so it really goes up the ramp).
 ## 3. Long routes: random pairs of open base cells far apart; times the searches.
 ## 4. A squad marched up a ramp: every man ends on the top level, and no man ever jumps more than 0.5 m in a frame.
+## 5. Drawn lines (right drag): two squads sent onto a long, a medium and a short line, drawn both ways. Every man
+##    ends in place, faces the right way, the front rank lies on the drawn line, and the men across the whole line
+##    are evenly spaced with no gap between the squads (one solid line). Men stop within 5 cm of their place, so
+##    two neighbours may be up to 10 cm out.
 ## Run:  Godot --headless --path . --script res://tools/check_squads.gd [-- --seeds=1,2 --size=1000x1500]
 ## Ends with "SQUAD CHECK DONE <seeds> <fails>".
 
@@ -156,3 +160,87 @@ func _check(seed: int, w: int, h: int) -> void:
 		_ok(jump < 0.5, "squad up a ramp: biggest height step in a frame %.2f m" % jump)
 		sq.free()
 		break
+	_check_lines(nav, rng, w, h)
+
+
+## Somewhere flat and open, about 80 x 80 m.
+func _flat_spot(nav: NavGrid, rng: RandomNumberGenerator, w: int, h: int) -> Variant:
+	for t in 4000:
+		var c := Vector2(rng.randf_range(100, w * 8.0 - 100), rng.randf_range(100, h * 8.0 - 100))
+		var y := nav.height(c)
+		var good := true
+		for gx in range(-40, 41, 4):
+			for gz in range(-40, 41, 4):
+				var q := c + Vector2(gx, gz)
+				if not nav.is_open(q) or absf(nav.height(q) - y) > 0.01 or nav.astar.get_point_weight_scale(nav.cell_of(q)) > 1.0:
+					good = false
+					break
+			if not good:
+				break
+		if good:
+			return c
+	return null
+
+
+func _check_lines(nav: NavGrid, rng: RandomNumberGenerator, w: int, h: int) -> void:
+	var c: Variant = _flat_spot(nav, rng, w, h)
+	_ok(c != null, "found flat open ground for the line test")
+	if c == null:
+		return
+	var sqs: Array[Squad] = []
+	for k in 2:
+		var sq := Squad.new()
+		root.add_child(sq)
+		sq.setup(nav, c + Vector2(-12 + 24 * k, 25), Vector2(0, -1), 11 + k, "Line %d" % k)
+		sq.set_process(false)
+		sqs.append(sq)
+	# [line length, drawn direction, men wide each squad should be]
+	var cases := [[50.6, Vector2(1, 0), 12], [24.2, Vector2(0, 1), 6], [24.2, Vector2(-1, 0), 6], [2.0, Vector2(0.6, -0.8), 3]]
+	for cs in cases:
+		var L: float = cs[0]
+		var dir: Vector2 = (cs[1] as Vector2).normalized()
+		var a: Vector2 = c - dir * L * 0.5
+		var b: Vector2 = c + dir * L * 0.5
+		var plan := SquadControl.plan_line(sqs, a, b)
+		var face := Vector2(dir.y, -dir.x)
+		for p: Dictionary in plan:
+			(p["squad"] as Squad).order_move(p["at"], false, p["face"], p["width"])
+		var frames := 0
+		while frames < 60 * 150:
+			for sq in sqs:
+				sq._step(1.0 / 60.0)
+				sq._place_men(1.0 / 60.0)
+			frames += 1
+			if frames % 60 == 0:
+				var settled := true
+				for sq in sqs:
+					if sq.moving():
+						settled = false
+					for i in sq.men.size():
+						if sq.mpos[i].distance_to(sq._slot(i)) > 0.1 or absf(angle_difference(sq.mface[i], Squad._yaw(face))) > 0.05:
+							settled = false
+				if settled:
+					break
+		var width: int = cs[2]
+		var front: Array[float] = []                   # where each front-rank man sits along the line
+		var off_line := 0.0
+		var bad_face := 0
+		for sq in sqs:
+			for i in sq.men.size():
+				if absf(angle_difference(sq.mface[i], Squad._yaw(face))) > 0.05:
+					bad_face += 1
+				if i < sq.files:
+					front.append((sq.mpos[i] - c).dot(dir))
+					off_line = maxf(off_line, absf((sq.mpos[i] - c).dot(face)))
+		front.sort()
+		var gap_err := 0.0
+		for k in range(1, front.size()):
+			gap_err = maxf(gap_err, absf(front[k] - front[k - 1] - Squad.LINE_GAP))
+		var what := "line %.0f m drawn %s: " % [L, str(dir)]
+		_ok(frames < 60 * 150, what + "everyone in place after %.1f s" % (frames / 60.0))
+		_ok(sqs[0].files == width and sqs[1].files == width, what + "%d and %d men wide (want %d)" % [sqs[0].files, sqs[1].files, width])
+		_ok(bad_face == 0, what + "%d men facing the wrong way" % bad_face)
+		_ok(off_line < 0.08, what + "front rank on the drawn line (worst %.2f m off)" % off_line)
+		_ok(front.size() == 2 * width and gap_err < 0.12, what + "one solid line of %d men, spacing off by %.2f m at worst" % [front.size(), gap_err])
+	for sq in sqs:
+		sq.free()
