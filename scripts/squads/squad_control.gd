@@ -17,7 +17,8 @@ extends Node3D
 ## - Engineers (building round): a move order drops their building jobs; a right click on a building that is not
 ##   finished sends the selected engineers to build it (other squads just move there).
 ## - Fighting round: a right click on an enemy squad has the selected squads attack it (they close to range and
-##   fire); a right click on a finished MG nest or gun pit sends the first selected rifle squad to man it.
+##   fire); a right click on a finished MG nest or gun pit sends the first selected rifle squad to man it, and on a
+##   house, ruin or one of our finished buildings to go in and fight from it (fighting round 2).
 ## Orders are instant for now: the comms network (step 3) will delay them later.
 
 const PICK_PX := 22.0
@@ -277,6 +278,14 @@ func _right_click(at: Vector2) -> void:
 			for s in sel:
 				if s.can_fire():
 					combat.man_post(s, post)
+					return
+	if combat != null and not run:
+		var house: Variant = combat.garrison_at(g)
+		if house != null:
+			for s in sel:
+				if s.can_fire():
+					combat.garrison(s, house)
+					say("%s into the %s" % [s.title, house.label()])
 					return
 	if build != null and not run:
 		var site: Variant = build.site_at(g)
