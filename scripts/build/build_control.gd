@@ -14,7 +14,8 @@ extends Node3D
 ##   building nobody is working on. Delete or X over a building that is not finished cancels it.
 ## - Delete or X over a finished building has engineers take it down: the stages run backwards (half, frame,
 ##   plot) in half its build time, then the ground opens again.
-## - Building is free for now (supply comes later).
+## - Recruitment round: building costs supply (RecruitControl.BUILD_COST; lines by the piece). A ghost you cannot
+##   pay for shows red. Cancelling a building before it is finished gives its supply back; taking one down, half.
 
 const LINE_KINDS := ["wall", "sandbag_line", "wire_belt", "concertina", "hedgehogs", "teeth"]
 const WALL_PIECES := ["tower", "bastion", "gate"]  # single wall cells; they join the wall like any wall cell
@@ -51,6 +52,7 @@ var _line_from: Variant = null                 # the cell a line drag started on
 var _far := false
 var _night := false
 var comms: Node                                # the CommsControl: "Telegraph wire" in the menu hands over to it
+var economy: Node                              # the RecruitControl (supply), if there is one: placing costs supply
 
 
 func _ready() -> void:
@@ -264,6 +266,8 @@ func _show_stage(s: BuildSite) -> void:
 func cancel(s: BuildSite) -> void:
 	if s.done or s.demolish or not sites.has(s):
 		return
+	if economy != null:
+		economy.refund(float(s.get_meta("paid", 0.0)))
 	_remove(s)
 
 
@@ -454,6 +458,8 @@ func _finish(s: BuildSite) -> void:
 
 ## A building taken down: it goes, and its crews move on like after finishing one.
 func _taken_down(s: BuildSite) -> void:
+	if economy != null:
+		economy.refund(float(s.get_meta("paid", 0.0)) * 0.5)
 	var crew := s.crews.duplicate()
 	_remove(s)
 	for sq in crew:
@@ -546,17 +552,44 @@ func _unhandled_input(event: InputEvent) -> void:
 			if mb.pressed:
 				_line_from = nav.cell_of(p)
 			elif _line_from != null:
-				var made := place_line(placing, _line_from, nav.cell_of(p), men_cells())
+				var men := men_cells()
+				var n := 0
+				for c in line_cells(_line_from, nav.cell_of(p)):
+					if cell_ok(c, -1, men):
+						n += 1
+				var each := cost_of(placing)
+				if economy != null and n > 0 and not economy.pay(each * n):
+					_line_from = null
+					return
+				var made := place_line(placing, _line_from, nav.cell_of(p), men)
 				_line_from = null
+				if economy != null:
+					economy.refund(each * (n - made.size()))
+				for s in made:
+					s.set_meta("paid", each)
 				_after_place(made, mb.shift_pressed)
 		elif mb.pressed:
 			var size := footprint(placing, rot)
-			var s := place(placing, origin_at(p, size), rot, men_cells())
-			if s == null:
+			var o := origin_at(p, size)
+			if not fits(o, size, men_cells()):
 				say("It doesn't fit there")
 				return
+			if economy != null and not economy.pay(cost_of(placing)):
+				return
+			var s := place(placing, o, rot, men_cells())
+			if s == null:
+				if economy != null:
+					economy.refund(cost_of(placing))
+				say("It doesn't fit there")
+				return
+			s.set_meta("paid", cost_of(placing))
 			var made: Array[BuildSite] = [s]
 			_after_place(made, mb.shift_pressed)
+
+
+## What a building (or one piece of a line) costs: nothing without an economy.
+func cost_of(k: String) -> float:
+	return float(RecruitControl.build_cost(k)) if economy != null else 0.0
 
 
 func _after_place(made: Array[BuildSite], keep: bool) -> void:
@@ -620,13 +653,14 @@ func _update_ghost() -> void:
 		var along_z := cells.size() > 1 and cells[1].x == cells[0].x
 		var r := 1 if along_z else 0
 		_show_ghosts(cells.size())
+		var afford: bool = economy == null or economy.can_pay(cost_of(placing) * cells.size())
 		for i in cells.size():
-			_ghost_at(i, cells[i], Vector2i.ONE, r, cell_ok(cells[i], -1, men))
+			_ghost_at(i, cells[i], Vector2i.ONE, r, afford and cell_ok(cells[i], -1, men))
 	else:
 		var size := footprint(placing, rot)
 		var o := origin_at(p, size)
 		_show_ghosts(1)
-		_ghost_at(0, o, size, rot, fits(o, size, men))
+		_ghost_at(0, o, size, rot, fits(o, size, men) and (economy == null or economy.can_pay(cost_of(placing))))
 
 
 # ------------------------------------------------------------------ every frame
