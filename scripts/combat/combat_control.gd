@@ -36,6 +36,9 @@ extends Node3D
 ##   sees and shoots further (15% for each level above, and from inside a building).
 ## - Fog of war: enemies are hidden until one of ours sees them (260 m by day, less at night and in fog; finished
 ##   buildings see 150 m round them). A firing enemy gives himself away within 400 m.
+## Comms round: squads near the officer hit more and are pinned less (CommsControl.STEADY, CALM); when the officer
+## himself is hit CommsControl decides (wounded first, then dead); shells cut telegraph wire; a wave whose last man
+## falls counts as beaten off.
 
 const THINK := 0.25                            # seconds between brain ticks
 const SUPP_DECAY := 0.3
@@ -89,7 +92,10 @@ var _fired := {}                               # enemy Squad -> when it last fir
 var wounded: Array[Dictionary] = []            # {"body", "kind", "t", "state" ("down", "walk"), "path", "aid"}
 var aid := {}                                  # BuildSite -> Array of [kind, time he is fit again]
 var _sight_t := 0.0
-var stats := {"shots": [0, 0], "hits": [0, 0], "blows": [0, 0], "kills": [0, 0], "wounded": 0}   # by the side that did it
+var stats := {"shots": [0, 0], "hits": [0, 0], "blows": [0, 0], "kills": [0, 0], "wounded": 0, "dead": [0, 0]}   # by the side that did it ("dead": by the side that fell)
+var comms: Node                                # the CommsControl (the officer, wire), if there is one
+var _waves := {}                               # wave number -> enemy squads still standing
+var _wave_n := 0
 
 
 func _ready() -> void:
@@ -120,6 +126,9 @@ func reset(nav_grid: NavGrid, map_data: MapData) -> void:
 	seen.clear()
 	_fired.clear()
 	_site_garrisons.clear()
+	_waves.clear()
+	set_meta("waves_beaten", 0)
+	stats["dead"] = [0, 0]
 	nav = nav_grid
 	data = map_data
 	garrisons = Garrison.from_map(map_data)
@@ -170,6 +179,7 @@ func spawn(what: String, near: Vector2, ahead := SPAWN_AHEAD) -> Array[Squad]:
 	var made: Array[Squad] = []
 	var c := spawn_point(near, ahead)
 	var plan: Array = []                       # [kind, men, sub, title, offset]
+	_wave_n += 1
 	match what:
 		"redcoats":
 			plan = [["redcoats", 12, "", "Red coats 1", Vector2(-16, 0)], ["redcoats", 12, "", "Red coats 2", Vector2(16, 0)]]
@@ -190,6 +200,8 @@ func spawn(what: String, near: Vector2, ahead := SPAWN_AHEAD) -> Array[Squad]:
 		e.setup(nav, where, Vector2(0, 1), _seed, p[3], p[0], p[1], p[2], _seed % 6)
 		enemies.append(e)
 		made.append(e)
+		e.set_meta("wave", _wave_n)
+		_waves[_wave_n] = int(_waves.get(_wave_n, 0)) + 1
 	say("%s coming from the north" % {"redcoats": "Red coats", "medieval": "The medieval host", "zombies": "Zombies"}[what])
 	return made
 
@@ -427,7 +439,14 @@ func hit_chance(from: Squad, to: Squad, d: float, at: Vector2) -> float:
 		p *= 0.4
 	if to.moving() and to.running:
 		p *= 0.6                               # a running man is harder to hit
+	if comms != null and from.side == 0 and comms.near_officer(from):
+		p *= CommsControl.STEADY               # steadier fire near the officer
 	return p
+
+
+## Suppression taken near the officer is less.
+func _calm(s: Squad) -> float:
+	return CommsControl.CALM if comms != null and comms.near_officer(s) else 1.0
 
 
 func _resolve() -> void:
@@ -445,14 +464,14 @@ func _resolve() -> void:
 				var from: Squad = e["from"]
 				if not is_instance_valid(to) or not is_instance_valid(from):
 					continue
-				to.supp += float(from.spec["supp"])
+				to.supp += float(from.spec["supp"]) * _calm(to)
 				var j := to.index_of(e["victim"])
 				if j < 0:
 					continue
 				var d := from.center().distance_to(to.mpos[j])
 				stats["shots"][from.side] += 1
 				if rng.randf() < hit_chance(from, to, d, to.mpos[j]) * float(from.spec["range"]) / maxf(eff_range(from, to), 1.0):
-					to.supp += 0.12
+					to.supp += 0.12 * _calm(to)
 					stats["hits"][from.side] += 1
 					wound(to, j)
 			"blow":
@@ -508,6 +527,10 @@ func wound(s: Squad, j: int) -> void:
 	if int(s.md[j]["hp"]) > 0:
 		s.act(j, "hit")
 		return
+	if comms != null and String(s.md[j].get("role", "")) == "officer" and s.kind == "officer":
+		if not comms.officer_hit(s, j):
+			return                             # wounded, not dead: the guards carry him back
+	stats["dead"][s.side] += 1
 	var hurt := rng.randf() < float(s.spec.get("wound", 0.0))
 	var body := s.kill(j, corpses)
 	if hurt:
@@ -704,6 +727,8 @@ func _run_posts(dt: float) -> void:
 func shell(p: Vector2) -> void:
 	if blasts != null:
 		blasts.fire(3, p.x, p.y)
+	if comms != null:
+		comms.blast_at(p)
 	for s in ours() + enemies:
 		if s.men.is_empty() or s.center().distance_to(p) > 40.0:
 			continue
@@ -951,6 +976,12 @@ func _tidy() -> void:
 			b.queue_free()
 	for e in enemies.duplicate():
 		if e.men.is_empty():
+			var wn := int(e.get_meta("wave", 0))
+			if _waves.has(wn):
+				_waves[wn] = int(_waves[wn]) - 1
+				if int(_waves[wn]) <= 0:
+					_waves.erase(wn)
+					set_meta("waves_beaten", int(get_meta("waves_beaten", 0)) + 1)
 			enemies.erase(e)
 			seen.erase(e)
 			_fired.erase(e)
