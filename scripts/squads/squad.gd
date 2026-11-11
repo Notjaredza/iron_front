@@ -82,6 +82,9 @@ var in_post := false
 var mode := ""                                 # enemy behaviour: "", "march", "halt", "charge"
 var volleys := 0
 var think_t := 0.0                             # when the enemy brain last gave an order
+var full := MEN                                # men when at full strength (aid posts top up to this)
+var _seed := 0
+var _lord := -1
 
 
 ## The walk, run and ready clips (and the engineers' work clips), baked once per kind and shared by every squad.
@@ -103,36 +106,11 @@ func setup(nav_grid: NavGrid, where: Vector2, face: Vector2, seed_value: int, na
 	heading = face.normalized()
 	var cl := TroopKinds.clips(kind)
 	var roles := TroopKinds.roles(kind, count, sub)
+	full = count
+	_seed = seed_value
+	_lord = lord
 	for i in count:
-		var s := TroopKinds.make_man(kind, seed_value * 100 + i, roles[i], 1, lord)
-		add_child(s)
-		var ap := AnimationPlayer.new()
-		s.add_child(ap)
-		ap.add_animation_library("", TroopKinds.library(kind, s.geo))
-		var cm := TroopKinds.clip_map(kind, s)
-		men.append(s)
-		players.append(ap)
-		md.append({"clips": cm, "act_until": 0.0, "hp": int(spec["hp"]) * (2 if roles[i] in ARMOURED else 1),
-			"next_shot": randf() * 1.5, "shots": 0, "goal": null})
-		_clip.append("")
-		_at_work.append(false)
-		_play(i, "ready")
-		ap.seek(randf() * 0.9, true)
-		var ring := MeshInstance3D.new()
-		var tm := TorusMesh.new()
-		tm.inner_radius = 0.42
-		tm.outer_radius = 0.55
-		tm.rings = 16
-		tm.ring_segments = 4
-		ring.mesh = tm
-		ring.material_override = _flat(Color(1.0, 0.86, 0.25))
-		ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		ring.scale = Vector3(1, 0.15, 1)
-		ring.visible = false
-		add_child(ring)
-		rings.append(ring)
-		mpos.append(_slot_free(i))
-		mface.append(_yaw(heading))
+		_add_man(roles[i], seed_value * 100 + i, _slot_free_n(i, count))
 	# Walk and run at the speed the men's own clips were made for (the slowest man sets the pace).
 	walk_v = INF
 	run_v = INF
@@ -205,6 +183,65 @@ func set_running(on: bool) -> void:
 
 func men_left() -> int:
 	return men.size()
+
+
+## One more man in the squad (a top-up from an aid post), standing at `where`, of the squad's usual role.
+func add_man(where: Vector2) -> void:
+	var roles := TroopKinds.roles(kind, full, sub)
+	var role := roles[mini(men.size(), roles.size() - 1)]
+	if kind == "redcoats" or kind == "medieval":
+		role = roles[roles.size() - 1]             # top-ups are rank and file, not officers or banners
+	_seed += 1
+	_add_man(role, _seed * 100 + 77, where)
+	count = men.size()
+
+
+func _add_man(role: String, seed_value: int, where: Vector2) -> void:
+	var s := TroopKinds.make_man(kind, seed_value, role, 1, _lord)
+	add_child(s)
+	var ap := AnimationPlayer.new()
+	s.add_child(ap)
+	ap.add_animation_library("", TroopKinds.library(kind, s.geo))
+	var cm := TroopKinds.clip_map(kind, s)
+	men.append(s)
+	players.append(ap)
+	md.append({"clips": cm, "act_until": 0.0, "hp": int(spec["hp"]) * (2 if role in ARMOURED else 1),
+		"next_shot": randf() * 1.5, "shots": 0, "goal": null, "ammo": int(spec.get("ammo", 0))})
+	_clip.append("")
+	_at_work.append(false)
+	var i := men.size() - 1
+	_play(i, "ready")
+	ap.seek(randf() * 0.9, true)
+	var ring := MeshInstance3D.new()
+	var tm := TorusMesh.new()
+	tm.inner_radius = 0.42
+	tm.outer_radius = 0.55
+	tm.rings = 16
+	tm.ring_segments = 4
+	ring.mesh = tm
+	ring.material_override = _flat(Color(1.0, 0.86, 0.25))
+	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	ring.scale = Vector3(1, 0.15, 1)
+	ring.visible = false
+	add_child(ring)
+	rings.append(ring)
+	mpos.append(where)
+	mface.append(_yaw(heading))
+
+
+## How full the squad's pouches are, 0..1 (1 for troops without guns).
+func ammo_frac() -> float:
+	var most := int(spec.get("ammo", 0))
+	if most <= 0 or men.is_empty():
+		return 1.0
+	var n := 0
+	for d in md:
+		n += int(d.get("ammo", 0))
+	return float(n) / float(most * md.size())
+
+
+func out_of_ammo() -> bool:
+	return can_fire() and ammo_frac() <= 0.0
 
 
 func is_engineers() -> bool:
@@ -305,7 +342,11 @@ func _slot(i: int) -> Vector2:
 
 
 func _slot_free(i: int) -> Vector2:
-	var o := free_offset(i, mini(files, count), count)
+	return _slot_free_n(i, count)
+
+
+func _slot_free_n(i: int, n: int) -> Vector2:
+	var o := free_offset(i, mini(files, n), n)
 	var right := Vector2(-heading.y, heading.x)
 	var q := at + right * o.x - heading * o.y
 	return q if _same_ground(q, at) else at - heading * float(i) * 0.6
@@ -494,11 +535,13 @@ func _place_men(delta: float) -> void:
 	banner.position = Vector3(at.x, nav.height(at) + 4.0, at.y)
 	var tag := ""
 	if in_post and post != null:
-		tag = "  manning the %s" % ("MG nest" if (post as BuildSite).kind == "mg_nest" else "gun pit")
+		tag = "  in the %s" % (post.label() if post.has_method("label") else ("MG nest" if post.kind == "mg_nest" else "gun pit"))
 	elif pinned:
 		tag = "  PINNED"
 	elif melee_on:
 		tag = "  hand to hand"
+	if out_of_ammo():
+		tag += "  OUT OF AMMO"
 	banner.text = "%s  %d%s%s%s" % [title, men.size(), ("  >>" if running else "  >") if moving() else "",
 		("  " + status) if not status.is_empty() else "", tag]
 	if side == 1:
