@@ -97,6 +97,46 @@ static func spark() -> ArrayMesh:
 	return am
 
 
+## Shells round (2026-11-10): a shell, 8-sided and faceted, along +z from its base (0) to its nose (1).
+static func shell() -> ArrayMesh:
+	if _cache.has("shell"):
+		return _cache["shell"]
+	var v: Array[Vector3] = []
+	var rings := [[0.0, 0.17], [0.08, 0.2], [0.6, 0.2], [0.82, 0.13], [0.94, 0.05]]
+	for r: Array in rings:
+		for i in 8:
+			var a := TAU * (float(i) + 0.5) / 8.0
+			v.append(Vector3(cos(a) * float(r[1]), sin(a) * float(r[1]), float(r[0])))
+	v.append(Vector3(0, 0, 1.0))      # nose
+	v.append(Vector3(0, 0, 0.0))      # base centre
+	var f: Array = []
+	for ri in rings.size() - 1:
+		for i in 8:
+			var a := ri * 8 + i
+			var b := ri * 8 + (i + 1) % 8
+			f.append([a, b, a + 8])
+			f.append([b, b + 8, a + 8])
+	var last := (rings.size() - 1) * 8
+	for i in 8:
+		f.append([last + i, last + (i + 1) % 8, 40])
+		f.append([(i + 1) % 8, i, 41])
+	var c := Vector3(0, 0, 0.5)
+	var vv: Array[Vector3] = []
+	for p in v:
+		vv.append(p - c)
+	var am := _flat(vv, f, true)
+	# Move it back so the base sits at z = 0 (the check above needed it centred).
+	var arr := am.surface_get_arrays(0)
+	var pos: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
+	for i in pos.size():
+		pos[i] += c
+	arr[Mesh.ARRAY_VERTEX] = pos
+	var out := ArrayMesh.new()
+	out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
+	_cache["shell"] = out
+	return out
+
+
 ## Flat-shaded mesh from corners and faces. Each face's three corners are emitted with the face normal,
 ## wound so the outside is the front (Godot: clockwise seen from outside). check_out: fix each face to face
 ## away from the middle (for the irregular shapes).
